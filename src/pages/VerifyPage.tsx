@@ -385,22 +385,37 @@ export const VerifyPage: React.FC = () => {
 
                     {/* OCR Heatmap Overlay Mesh */}
                     {activeViewMode === 'ocr' && (
-                      <div className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-around">
-                        <div className="border border-cyan-400/80 bg-cyan-400/10 rounded p-2 max-w-[280px]">
-                          <span className="text-[9px] font-mono font-bold px-1 rounded bg-[#020412] text-cyan-400">
-                            OCR FIELD REGION: NAME
-                          </span>
-                        </div>
-                        <div className="border border-cyan-400/80 bg-cyan-400/10 rounded p-2 max-w-[220px]">
-                          <span className="text-[9px] font-mono font-bold px-1 rounded bg-[#020412] text-cyan-400">
-                            OCR FIELD: DOB / GENDER
-                          </span>
-                        </div>
-                        <div className="border border-cyan-400/80 bg-cyan-400/10 rounded p-2 max-w-[320px]">
-                          <span className="text-[9px] font-mono font-bold px-1 rounded bg-[#020412] text-cyan-400">
-                            OCR FIELD: NUMERIC ID REGISTRY
-                          </span>
-                        </div>
+                      <div className="absolute inset-0 pointer-events-none p-5 flex flex-col justify-around">
+                        {data.ocr.fields.fullName && (
+                          <div className="border border-cyan-400/90 bg-cyan-400/15 rounded p-1.5 max-w-[320px] shadow-lg shadow-cyan-500/20">
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#020412] text-cyan-300 block mb-0.5">
+                              OCR FIELD: FULL NAME
+                            </span>
+                            <span className="text-[11px] font-mono font-bold text-white pl-1">
+                              {data.ocr.fields.fullName}
+                            </span>
+                          </div>
+                        )}
+                        {data.ocr.fields.dateOfBirth && (
+                          <div className="border border-cyan-400/90 bg-cyan-400/15 rounded p-1.5 max-w-[260px] shadow-lg shadow-cyan-500/20">
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#020412] text-cyan-300 block mb-0.5">
+                              OCR FIELD: DOB / GENDER
+                            </span>
+                            <span className="text-[11px] font-mono font-bold text-white pl-1">
+                              {data.ocr.fields.dateOfBirth} {data.ocr.fields.gender ? `• ${data.ocr.fields.gender}` : ''}
+                            </span>
+                          </div>
+                        )}
+                        {data.ocr.fields.documentId && (
+                          <div className="border border-cyan-400/90 bg-cyan-400/15 rounded p-1.5 max-w-[340px] shadow-lg shadow-cyan-500/20">
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#020412] text-cyan-300 block mb-0.5">
+                              OCR FIELD: VERIFIED ID REGISTRY
+                            </span>
+                            <span className="text-[11px] font-mono font-bold text-white pl-1">
+                              {data.ocr.fields.documentId}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -408,21 +423,28 @@ export const VerifyPage: React.FC = () => {
                     {activeViewMode === 'forensic' && (
                       <div className="absolute inset-0 pointer-events-none p-6">
                         {data.verdict === 'Tampered' ? (
-                          <div className="absolute top-[22%] left-[10%] w-[32%] h-[46%] border-2 border-rose-500 bg-rose-500/20 rounded flex items-start justify-end p-1">
-                            <span className="text-[9px] font-mono font-bold px-1 rounded bg-rose-950 text-rose-300">
-                              TAMPER: SPLICED PHOTO
-                            </span>
-                          </div>
+                          <>
+                            <div className="absolute top-[22%] left-[8%] w-[34%] h-[48%] border-2 border-rose-500 bg-rose-500/25 rounded-lg flex items-start justify-end p-1 shadow-lg shadow-rose-500/30">
+                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-500/50">
+                                TAMPER: SPLICED PHOTO REGION
+                              </span>
+                            </div>
+                            <div className="absolute top-[35%] right-[12%] w-[45%] h-[24%] border-2 border-amber-500 bg-amber-500/20 rounded-lg flex items-start justify-end p-1">
+                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/50">
+                                SCREEN MOIRÉ FREQUENCY PATTERN
+                              </span>
+                            </div>
+                          </>
                         ) : data.verdict === 'Suspicious' ? (
-                          <div className="absolute top-[35%] left-[34%] w-[42%] h-[20%] border-2 border-amber-500 bg-amber-500/20 rounded flex items-start justify-end p-1">
-                            <span className="text-[9px] font-mono font-bold px-1 rounded bg-amber-950 text-amber-300">
-                              COMPRESSION ANOMALY
+                          <div className="absolute top-[32%] left-[30%] w-[46%] h-[22%] border-2 border-amber-500 bg-amber-500/25 rounded-lg flex items-start justify-end p-1 shadow-lg shadow-amber-500/30">
+                            <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/50">
+                              COMPRESSION ELA VARIANCE DELTA
                             </span>
                           </div>
                         ) : (
-                          <div className="absolute inset-4 border border-emerald-500/40 rounded flex items-end justify-end p-2">
-                            <span className="text-[9px] font-mono font-bold px-1 rounded bg-emerald-950 text-emerald-300">
-                              UNIFORM SCAN RASTER OK
+                          <div className="absolute inset-4 border-2 border-emerald-500/50 bg-emerald-500/5 rounded-xl flex items-end justify-end p-3">
+                            <span className="text-[9px] font-mono font-bold px-2 py-1 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/50">
+                              ✓ PHYSICAL SUBSTRATE SCAN RASTER OK
                             </span>
                           </div>
                         )}
