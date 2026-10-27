@@ -95,7 +95,7 @@ class DocuGuardPyTorchCNN(nn.Module):
 
 # ─── 2. Dataset Loader ────────────────────────────────────────────────────────
 class ForensicDataset(Dataset):
-    def __init__(self, root_dir, split='train', img_size=224, max_per_class=1000):
+    def __init__(self, root_dir, split='train', img_size=224, max_per_class=2000):
         self.img_size = img_size
         self.samples = []
         classes = ['real', 'suspicious', 'tampered']
@@ -317,7 +317,7 @@ def train(dataset_dir='dataset', epochs=15, batch_size=32, lr=0.001):
                     val_total += len(vy)
             val_acc = (val_correct / val_total) * 100.0 if val_total > 0 else 0
 
-        print(f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.1f}% | Val Acc: {val_acc:.1f}%")
+        print(f"Epoch {epoch:02d}/{epochs:02d} | Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.1f}% | Val Acc: {val_acc:.1f}%", flush=True)
         best_val_acc = max(best_val_acc, val_acc)
 
     # Export model to public/ai-model/
@@ -326,8 +326,8 @@ def train(dataset_dir='dataset', epochs=15, batch_size=32, lr=0.001):
     # Update metadata
     meta = {
         "model_name": "DocuGuard_Forensic_CNN",
-        "version": "1.0.0-trained",
-        "status": "READY — Fully trained on forensic document forgery dataset",
+        "version": "1.1.0-trained",
+        "status": "READY — Fully trained on multi-source forensic datasets (IMD2020 + Hugging Face AIForge-Doc-v1)",
         "input_size": 224,
         "classes": ["real", "suspicious", "tampered"],
         "num_classes": 3,
@@ -335,12 +335,13 @@ def train(dataset_dir='dataset', epochs=15, batch_size=32, lr=0.001):
         "final_train_accuracy": round(train_acc, 2),
         "best_val_accuracy": round(best_val_acc, 2),
         "trained_samples": len(train_ds),
+        "dataset_sources": ["IMD2020 Real & Tampered", "Hugging Face Scam-AI/AIForge-Doc-v1"],
         "output_heads": ["classification_output", "score_output", "heatmap_output"]
     }
     with open('public/ai-model/model_metadata.json', 'w') as f:
         json.dump(meta, f, indent=2)
 
-    print("[OK] Model metadata updated!")
+    print("[OK] Model metadata updated!", flush=True)
     print("=" * 65)
 
 if __name__ == '__main__':
