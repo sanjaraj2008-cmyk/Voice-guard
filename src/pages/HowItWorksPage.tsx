@@ -15,7 +15,7 @@ export const HowItWorksPage: React.FC<HowItWorksPageProps> = ({ onNavigate }) =>
             <span>TECHNICAL OVERVIEW</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-[#172033] mb-3">
-            How Voice Guard Works
+            How DocuGuard Works
           </h1>
           <p className="text-base text-[#586579] leading-relaxed">
             An open explanation of what runs on your computer, what checks are performed, and what the system cannot determine.
@@ -97,7 +97,7 @@ export const HowItWorksPage: React.FC<HowItWorksPageProps> = ({ onNavigate }) =>
             The In-Browser Neural Network
           </h2>
           <p className="text-sm text-[#586579] leading-relaxed mb-4">
-            Voice Guard includes a compact convolutional neural network running directly in your browser via TensorFlow.js.
+            DocuGuard includes a compact convolutional neural network running directly in your browser via TensorFlow.js.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm text-[#586579]">
@@ -118,7 +118,7 @@ export const HowItWorksPage: React.FC<HowItWorksPageProps> = ({ onNavigate }) =>
             Important Limitations
           </h2>
           <ul className="space-y-2 text-sm text-[#586579] list-disc list-inside">
-            <li>Voice Guard cannot verify whether a name or identification number is authentic in government records.</li>
+            <li>DocuGuard cannot verify whether a name or identification number is authentic in government records.</li>
             <li>Repeatedly sharing an image through messaging apps (WhatsApp, Telegram) can reduce compression signals.</li>
             <li>This software is a screening aid for human reviewers, not an official certificate of authenticity.</li>
           </ul>

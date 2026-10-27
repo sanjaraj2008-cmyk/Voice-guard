@@ -18,7 +18,7 @@ export const SecurityPage: React.FC<SecurityPageProps> = ({ onNavigate }) => {
             Your Documents Stay Private
           </h1>
           <p className="text-base text-[#586579] leading-relaxed">
-            A clear explanation of how Voice Guard handles your data, where analysis occurs, and what happens when you close the page.
+            A clear explanation of how DocuGuard handles your data, where analysis occurs, and what happens when you close the page.
           </p>
         </div>
 
@@ -55,7 +55,7 @@ export const SecurityPage: React.FC<SecurityPageProps> = ({ onNavigate }) => {
         {/* Detailed Data Handling Table */}
         <div className="vg-card p-6 sm:p-8 bg-white border border-[#E2E7EF] mb-8 shadow-sm">
           <h2 className="text-lg font-bold text-[#172033] mb-4">
-            How Data Moves Through Voice Guard
+            How Data Moves Through DocuGuard
           </h2>
 
           <div className="overflow-x-auto text-xs sm:text-sm">
@@ -104,7 +104,7 @@ export const SecurityPage: React.FC<SecurityPageProps> = ({ onNavigate }) => {
             Scope &amp; Practical Boundaries
           </h2>
           <p className="text-sm text-[#586579] leading-relaxed mb-4">
-            Voice Guard is designed as an accessible first-line screening tool for digital tampering:
+            DocuGuard is designed as an accessible first-line screening tool for digital tampering:
           </p>
 
           <ul className="space-y-2 text-sm text-[#586579] list-disc list-inside">

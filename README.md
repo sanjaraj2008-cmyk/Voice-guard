@@ -1,8 +1,8 @@
-# Voice Guard — Document Inspection & Manipulation-Risk Screening
+# DocuGuard — Document Inspection & Manipulation-Risk Screening
 
 > Client-side document forensics and manipulation-risk screening running 100% inside your web browser via HTML5 Canvas heuristics and TensorFlow.js.
 
-[![Vercel Deployment](https://img.shields.io/badge/Vercel-Live%20Deployment-2463a6?style=flat-square&logo=vercel)](https://voice-guard-git-main-atl-ee81.vercel.app)
+[![Vercel Deployment](https://img.shields.io/badge/Vercel-Live%20Deployment-315EFB?style=flat-square&logo=vercel)](https://voice-guard-eight.vercel.app/#verify)
 [![TensorFlow.js](https://img.shields.io/badge/TensorFlow.js-1.03M%20Params-FF6F00?style=flat-square&logo=tensorflow)](https://www.tensorflow.org/js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-slate?style=flat-square)](LICENSE)
 
@@ -10,15 +10,15 @@
 
 ## 📌 Project Overview
 
-**Voice Guard** is a specialized document inspection tool designed to examine identity cards, forms, and certificate images for indicators of digital manipulation without exposing sensitive personal documents to third-party cloud servers.
+**DocuGuard** is a specialized document inspection tool designed to examine identity cards, forms, and certificate images for indicators of digital manipulation without exposing sensitive personal documents to third-party cloud servers.
 
-Most identity verification workflows send documents to remote computer vision APIs. Voice Guard instead executes all image decoding, Error Level Analysis (ELA), frequency analysis, and neural network classification **directly in the client's browser sandbox** using Canvas APIs and WebGL.
+Most identity verification workflows send documents to remote computer vision APIs. DocuGuard instead executes all image decoding, Error Level Analysis (ELA), frequency analysis, and neural network classification **directly in the client's browser sandbox** using Canvas APIs and WebGL.
 
 ---
 
 ## 🔬 Implemented Inspection Architecture
 
-When an image is loaded, Voice Guard executes a sequential pipeline:
+When an image is loaded, DocuGuard executes a sequential pipeline:
 
 ```
 [Document Image]
@@ -51,7 +51,7 @@ When an image is loaded, Voice Guard executes a sequential pipeline:
 
 ## 📊 Neural Model & Benchmark Evaluation
 
-Voice Guard includes a client-side convolutional neural network trained on forensic document datasets and exported to TensorFlow.js format (`public/ai-model/model.json` + `group1-shard1of1.bin`).
+DocuGuard includes a client-side convolutional neural network trained on forensic document datasets and exported to TensorFlow.js format (`public/ai-model/model.json` + `group1-shard1of1.bin`).
 
 ### Dataset Composition
 The model was trained on a balanced corpus of 2,374 images:
@@ -74,7 +74,7 @@ The model was trained on a balanced corpus of 2,374 images:
 
 ## 🔒 Privacy & Data Flow Guarantees
 
-- **No Remote Document Transmission:** Voice Guard does not upload document files, image bytes, or extracted identity strings to any cloud API or remote server.
+- **No Remote Document Transmission:** DocuGuard does not upload document files, image bytes, or extracted identity strings to any cloud API or remote server.
 - **No Long-Term Browser Persistence:** Images and inspection dossiers exist only in transient memory during the active session. Navigating away or clearing storage removes all runtime artifacts.
 - **Auditable Source Code:** The inspection logic resides in `src/utils/edgePipeline.ts` and `src/utils/pixelForensics.ts` for full verification.
 
@@ -82,8 +82,8 @@ The model was trained on a balanced corpus of 2,374 images:
 
 ## ⚖️ Scope & Known Limitations
 
-1. **Not a Government Database Lookup:** Voice Guard screens for image tampering; it does not query UIDAI, national registries, or credit bureaus to verify if an identity exists.
-2. **No PKI Signature Verification:** Voice Guard does not cryptographically validate QR code digital signatures unless a specific PKI public key validator is integrated.
+1. **Not a Government Database Lookup:** DocuGuard screens for image tampering; it does not query UIDAI, national registries, or credit bureaus to verify if an identity exists.
+2. **No PKI Signature Verification:** DocuGuard does not cryptographically validate QR code digital signatures unless a specific PKI public key validator is integrated.
 3. **Compression Vulnerability:** Documents repeatedly saved through aggressive social media compression (e.g. WhatsApp, Telegram at ~50% JPEG quality) lose high-frequency quantization details, which can reduce ELA sensitivity.
 4. **Physical Counterfeits:** Documents physically printed on legitimate cardstock with falsified data cannot be detected by digital raster analysis alone.
 

@@ -68,7 +68,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
         </div>
 
         <h2 className="text-lg font-bold text-[#172033] mb-1">
-          Voice Guard
+          DocuGuard
         </h2>
         <p className="text-xs text-[#586579] mb-6">
           Document Image Tampering Screening

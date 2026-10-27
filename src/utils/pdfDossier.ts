@@ -45,7 +45,7 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
     pdf.setTextColor(23, 32, 51); // #172033
     pdf.setFontSize(13);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('Voice Guard', margin + 7, y + 8);
+    pdf.text('DocuGuard', margin + 7, y + 8);
 
     pdf.setFontSize(8.5);
     pdf.setFont('helvetica', 'normal');
@@ -72,7 +72,7 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
     pdf.setTextColor(140, 150, 165);
     pdf.setFontSize(7);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Voice Guard · Automated document image screening tool · Not an official legal certification', margin, footerY);
+    pdf.text('DocuGuard · Automated document image screening tool · Not an official legal certification', margin, footerY);
     pdf.text(`Page ${page} of ${total}`, pageWidth - margin, footerY, { align: 'right' });
   };
 
@@ -312,7 +312,7 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
   pdf.setFontSize(6.8);
   pdf.setTextColor(120, 53, 15);
   pdf.text(
-    'Automated screening can make mistakes. A clean result does not guarantee that a document is genuine. Voice Guard evaluates digital image anomalies and compression characteristics locally in your browser. It does not replace official physical or laboratory verification.',
+    'Automated screening can make mistakes. A clean result does not guarantee that a document is genuine. DocuGuard evaluates digital image anomalies and compression characteristics locally in your browser. It does not replace official physical or laboratory verification.',
     margin + 4,
     y + 9.5,
     { maxWidth: contentWidth - 8 }
@@ -326,6 +326,6 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
   }
 
   // Save the PDF
-  pdf.save(`VoiceGuard_Screening_Report_${data.documentId}.pdf`);
+  pdf.save(`DocuGuard_Screening_Report_${data.documentId}.pdf`);
 }
 

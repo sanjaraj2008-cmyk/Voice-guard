@@ -562,7 +562,7 @@ export const VerifyPage: React.FC = () => {
                 </div>
               ) : (
                 <p className="text-xs sm:text-sm text-[#586579] pt-1">
-                  No text extraction or identity field parsing was performed on this document. Voice Guard evaluated image compression, sharpness, and visual characteristics only.
+                  No text extraction or identity field parsing was performed on this document. DocuGuard evaluated image compression, sharpness, and visual characteristics only.
                 </p>
               )}
             </div>

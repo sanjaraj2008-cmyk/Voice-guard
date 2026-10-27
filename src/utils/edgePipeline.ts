@@ -383,7 +383,7 @@ export async function runEdgeVerificationPipeline(
       aiModelPrediction = await docuGuardAI.predict(img);
     }
   } catch (err) {
-    console.warn('[Voice Guard] In-browser neural classifier unavailable; using pixel and metadata heuristics:', err);
+    console.warn('[DocuGuard] In-browser neural classifier unavailable; using pixel and metadata heuristics:', err);
   }
 
   // Step 4: Preparing the results
@@ -544,7 +544,7 @@ export async function runEdgeVerificationPipeline(
     category: 'ocr',
     weight: 0,
     observation: 'Government registry lookup and cryptographic QR signature check: NOT CHECKED',
-    explanation: 'Voice Guard checks for digital image manipulation only. It does not connect to government databases or verify cryptographic issuer certificates.',
+    explanation: 'DocuGuard checks for digital image manipulation only. It does not connect to government databases or verify cryptographic issuer certificates.',
     howChecked: 'Service capability disclosure',
     whyItMatters: 'A document can be digitally unedited but still contain false or fabricated identity information.',
     limitations: 'Cannot confirm if an individual legitimately exists or if a card was officially issued.',
@@ -556,7 +556,7 @@ export async function runEdgeVerificationPipeline(
   const verdict: VerdictType = finalScore >= 80 ? 'Real' : finalScore >= 50 ? 'Suspicious' : 'Tampered';
 
   return {
-    documentId: `VG-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`,
+    documentId: `DG-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`,
     fileName,
     generatedAt: new Date().toISOString(),
     score: finalScore,

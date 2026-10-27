@@ -22,7 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
         <button
           onClick={() => handleNavClick('home')}
           className="flex items-center gap-2.5 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#315EFB] rounded-lg p-1"
-          aria-label="Voice Guard Home"
+          aria-label="DocuGuard Home"
         >
           <div className="w-8 h-8 rounded-lg bg-[#315EFB] flex items-center justify-center text-white shrink-0 shadow-sm">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -31,7 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
           </div>
           <div>
             <span className="text-base font-bold text-[#172033] block leading-tight">
-              Voice Guard
+              DocuGuard
             </span>
             <span className="text-xs text-[#586579] block font-normal">
               Document Image Checker
