@@ -7,142 +7,130 @@ interface HowItWorksPageProps {
 
 export const HowItWorksPage: React.FC<HowItWorksPageProps> = ({ onNavigate }) => {
   return (
-    <main className="min-h-screen pb-16 bg-[#F8FAFC]">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
-        {/* Header */}
+    <main className="min-h-screen pb-16 bg-[#F7F8FA]">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+        {/* Page Header */}
         <div className="mb-10 text-center max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 mb-3">
-            <span>Engineering Architecture</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-[#586579] bg-[#EEF2F6] border border-[#E2E7EF] mb-3">
+            <span>TECHNICAL OVERVIEW</span>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-3">
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#172033] mb-3">
             How Voice Guard Works
           </h1>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            A transparent overview of the in-browser inspection pipeline, heuristic algorithms, neural architecture, and current operating limitations.
+          <p className="text-base text-[#586579] leading-relaxed">
+            An open explanation of what runs on your computer, what checks are performed, and what the system cannot determine.
           </p>
         </div>
 
-        {/* Pipeline Architecture Diagram */}
-        <div className="surface-card p-6 sm:p-8 rounded-xl border border-slate-200 mb-10">
-          <h2 className="text-base font-bold text-slate-900 mb-6">
-            Client-Side Execution Flow
+        {/* 4-Step Plain Language Flow */}
+        <div className="vg-card p-6 sm:p-8 bg-white border border-[#E2E7EF] mb-8 shadow-sm">
+          <h2 className="text-lg font-bold text-[#172033] mb-6">
+            The Inspection Steps
           </h2>
 
           <div className="space-y-6">
             {/* Step 1 */}
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2463a6] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-blue-200">
+              <div className="w-8 h-8 rounded-full bg-[#EEF2F6] text-[#315EFB] text-xs font-bold font-mono flex items-center justify-center shrink-0">
                 01
               </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                  Local Ingestion &amp; Canvas Bitmap Decoding
+              <div>
+                <h3 className="text-base font-bold text-[#172033] mb-1">
+                  Local image loading
                 </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  The document is loaded directly into browser memory as a Blob via the HTML5 File API. An offscreen <code>HTMLCanvasElement</code> decodes the raster bitmap at natural resolution. No network socket or API payload is initiated.
+                <p className="text-sm text-[#586579] leading-relaxed">
+                  When you select an image, your browser decodes the file into temporary memory. No image data or personal details are uploaded to a remote server.
                 </p>
               </div>
             </div>
 
             {/* Step 2 */}
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2463a6] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-blue-200">
+              <div className="w-8 h-8 rounded-full bg-[#EEF2F6] text-[#315EFB] text-xs font-bold font-mono flex items-center justify-center shrink-0">
                 02
               </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                  Laplacian Edge Variance (Sharpness Filter)
+              <div>
+                <h3 className="text-base font-bold text-[#172033] mb-1">
+                  Image quality and blur check
                 </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Convolves the grayscale image against a discrete 3x3 Laplacian kernel <code>[0, 1, 0; 1, -4, 1; 0, 1, 0]</code> to calculate edge variance. Documents below threshold (80.0) are flagged for blur, as diffuse edges can obscure secondary manipulation.
+                <p className="text-sm text-[#586579] leading-relaxed">
+                  The software measures edge contrast (Laplacian variance) across the image. An image with low contrast or heavy blur is flagged because blur makes visual editing harder to identify.
                 </p>
               </div>
             </div>
 
             {/* Step 3 */}
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2463a6] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-blue-200">
+              <div className="w-8 h-8 rounded-full bg-[#EEF2F6] text-[#315EFB] text-xs font-bold font-mono flex items-center justify-center shrink-0">
                 03
               </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                  Error Level Analysis (ELA) Compression Discrepancy
+              <div>
+                <h3 className="text-base font-bold text-[#172033] mb-1">
+                  Compression difference screening (Error Level Analysis)
                 </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  The canvas exports a temporary 75% quality JPEG in memory. The pixel delta between original and recompressed frames is computed across 16x16 macroblocks. Locally altered areas (e.g. spliced text or modified dates) often display higher error variance.
+                <p className="text-sm text-[#586579] leading-relaxed">
+                  When someone edits a JPEG image (such as modifying numbers or pasting a new portrait), the modified area often recompresses at a different rate than the background. The software divides the image into 16x16 blocks to detect these differences.
                 </p>
               </div>
             </div>
 
             {/* Step 4 */}
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2463a6] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-blue-200">
+              <div className="w-8 h-8 rounded-full bg-[#EEF2F6] text-[#315EFB] text-xs font-bold font-mono flex items-center justify-center shrink-0">
                 04
               </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                  In-Browser Convolutional Neural Network (TensorFlow.js)
+              <div>
+                <h3 className="text-base font-bold text-[#172033] mb-1">
+                  Metadata and editing signatures
                 </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  The image is resized to 224x224 and fed to a 1.03M parameter convolutional neural network running on the browser's WebGL / WASM backend. Trained on 2,374 forensic samples from IMD2020 and AIForge datasets to output classification probabilities for Real, Suspicious, or Tampered.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 5 */}
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2463a6] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-blue-200">
-                05
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                  EXIF &amp; Binary Header Inspection
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  The initial 64KB binary segment is scanned for JPEG APP1 markers and TIFF tags to verify whether the image retains standard camera metadata or contains signatures inserted by photo-editing tools like Adobe Photoshop, GIMP, or Canva.
+                <p className="text-sm text-[#586579] leading-relaxed">
+                  The image file header is scanned to see if it carries signatures from digital image editors like Photoshop, GIMP, or Canva, rather than standard camera hardware tags.
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Model Specs & Limitations */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          <div className="surface-card p-5 rounded-xl border border-slate-200">
-            <h3 className="text-sm font-bold text-slate-900 mb-2">
-              Neural Network Architecture
-            </h3>
-            <ul className="space-y-2 text-xs text-slate-600 font-mono">
-              <li>• Parameters: 1,032,005 float32 weights (4.13 MB)</li>
-              <li>• Input: 224 x 224 x 3 normalized tensors</li>
-              <li>• Training Split: 1,912 train / 462 val images</li>
-              <li>• Training Epochs: 15 epochs via PyTorch</li>
-              <li>• Best Validation Accuracy: 66.45%</li>
-              <li>• Runtime Backend: TensorFlow.js LayersModel (WebGL)</li>
-            </ul>
-          </div>
+        {/* Neural Network Model Information */}
+        <div className="vg-card p-6 sm:p-8 bg-white border border-[#E2E7EF] mb-8 shadow-sm">
+          <h2 className="text-lg font-bold text-[#172033] mb-2">
+            The In-Browser Neural Network
+          </h2>
+          <p className="text-sm text-[#586579] leading-relaxed mb-4">
+            Voice Guard includes a compact convolutional neural network running directly in your browser via TensorFlow.js.
+          </p>
 
-          <div className="surface-card p-5 rounded-xl border border-slate-200">
-            <h3 className="text-sm font-bold text-slate-900 mb-2">
-              Recognized Limitations
-            </h3>
-            <ul className="space-y-2 text-xs text-slate-600">
-              <li>• <strong>No PKI Verification:</strong> Does not cryptographically validate digital signatures or QR payloads.</li>
-              <li>• <strong>No Registry Lookup:</strong> Does not query government databases or confirm identity existence.</li>
-              <li>• <strong>Compression Sensitivities:</strong> High overall recompression (e.g. via messaging apps) can diminish ELA accuracy.</li>
-              <li>• <strong>Evaluation Context:</strong> 66.5% validation accuracy reflects academic dataset benchmarks; real-world field performance may vary.</li>
-            </ul>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm text-[#586579]">
+            <div className="p-3.5 rounded-lg bg-[#F7F8FA] border border-[#E2E7EF]">
+              <span className="font-semibold text-[#172033] block mb-1">Model Size &amp; Training:</span>
+              <p>1,032,005 parameters (4.13 MB). Trained on 2,374 forensic document images from the IMD2020 and AIForge datasets.</p>
+            </div>
+            <div className="p-3.5 rounded-lg bg-[#F7F8FA] border border-[#E2E7EF]">
+              <span className="font-semibold text-[#172033] block mb-1">Tested Accuracy:</span>
+              <p>Achieved 66.45% validation accuracy on test splits. Real-world performance on novel layouts may vary.</p>
+            </div>
           </div>
         </div>
 
-        {/* Action */}
-        <div className="text-center">
-          <button 
-            onClick={() => onNavigate('verify')}
-            className="btn-primary text-sm py-2 px-5"
-          >
-            Try Document Inspection
-          </button>
+        {/* Clear Limitations Disclosure */}
+        <div className="vg-card p-6 sm:p-8 bg-white border border-[#E2E7EF] shadow-sm">
+          <h2 className="text-lg font-bold text-[#172033] mb-2">
+            Important Limitations
+          </h2>
+          <ul className="space-y-2 text-sm text-[#586579] list-disc list-inside">
+            <li>Voice Guard cannot verify whether a name or identification number is authentic in government records.</li>
+            <li>Repeatedly sharing an image through messaging apps (WhatsApp, Telegram) can reduce compression signals.</li>
+            <li>This software is a screening aid for human reviewers, not an official certificate of authenticity.</li>
+          </ul>
+
+          <div className="mt-6 pt-4 border-t border-[#E2E7EF]">
+            <button 
+              onClick={() => onNavigate('verify')}
+              className="vg-btn-primary text-sm py-2 px-5"
+            >
+              Check a document image
+            </button>
+          </div>
         </div>
       </div>
     </main>

@@ -36,7 +36,7 @@ export const SettingsPage: React.FC = () => {
       setClearedModels(true);
       setTimeout(() => setClearedModels(false), 2500);
     } catch (err) {
-      console.warn('Cache clearing error:', err);
+      console.warn('Cache clearing notice:', err);
     }
   };
 
@@ -48,75 +48,75 @@ export const SettingsPage: React.FC = () => {
       setClearedHistory(true);
       setTimeout(() => setClearedHistory(false), 2500);
     } catch (err) {
-      console.warn('Storage clearing error:', err);
+      console.warn('Storage clearing notice:', err);
     }
   };
 
   return (
-    <main className="min-h-screen pb-16 bg-[#F8FAFC]">
+    <main className="min-h-screen pb-16 bg-[#F7F8FA]">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 mb-1">
-            Storage &amp; Runtime Settings
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#172033] mb-1">
+            Browser Storage &amp; Settings
           </h1>
-          <p className="text-sm text-slate-600">
-            Manage locally cached neural weights, browser storage, and execution preferences.
+          <p className="text-sm text-[#586579]">
+            Manage downloaded neural weights, temporary memory, and local browser data.
           </p>
         </div>
 
-        {/* Runtime Status */}
-        <div className="surface-card p-5 rounded-xl border border-slate-200 mb-6 bg-white">
-          <div className="flex items-center gap-2.5 mb-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <h2 className="text-sm font-bold text-slate-900">
-              Execution Mode: Strictly Client-Side
+        {/* Local Processing Status */}
+        <div className="vg-card p-5 bg-white border border-[#E2E7EF] mb-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#15803d]" />
+            <h2 className="text-sm font-bold text-[#172033]">
+              Running 100% on this computer
             </h2>
           </div>
-          <p className="text-xs text-slate-600 leading-relaxed">
-            All document verification operations execute within your browser sandbox. No telemetry, identity document images, or extracted fields are persisted or transmitted across the network.
+          <p className="text-xs sm:text-sm text-[#586579] leading-relaxed">
+            All document checks occur in your browser's private memory. No document images or personal details are uploaded across the internet.
           </p>
         </div>
 
-        {/* Storage Management Panel */}
-        <div className="surface-card p-6 rounded-xl border border-slate-200 space-y-5">
-          <h2 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
-            Local Browser Storage Management
+        {/* Data Clearing Options */}
+        <div className="vg-card p-6 bg-white border border-[#E2E7EF] space-y-5 shadow-sm">
+          <h2 className="text-sm font-bold text-[#172033] pb-2 border-b border-[#E2E7EF]">
+            Clear Local Data
           </h2>
 
-          {/* Model Cache */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-slate-50 border border-slate-200">
+          {/* Model Weights */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-[#F7F8FA] border border-[#E2E7EF]">
             <div>
-              <span className="text-sm font-semibold text-slate-900 block">
-                Cached Neural Weights (TensorFlow.js)
+              <span className="text-sm font-semibold text-[#172033] block">
+                Cached Model Weights
               </span>
-              <span className="text-xs text-slate-500">
-                Static binary shards (4.13 MB) stored in browser HTTP cache and IndexedDB.
+              <span className="text-xs text-[#586579]">
+                Downloaded neural network file (4.13 MB) stored in your browser's cache for quick re-use.
               </span>
             </div>
             <button
               onClick={handleClearModelCache}
-              className="btn-secondary text-xs py-1.5 px-3 shrink-0"
+              className="vg-btn-secondary text-xs sm:text-sm py-2 px-3.5 shrink-0"
             >
-              {clearedModels ? '✓ Cache Cleared' : 'Clear Model Cache'}
+              {clearedModels ? '✓ Model cache cleared' : 'Clear model cache'}
             </button>
           </div>
 
-          {/* Verification History / Local Storage */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-slate-50 border border-slate-200">
+          {/* Session Data */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-[#F7F8FA] border border-[#E2E7EF]">
             <div>
-              <span className="text-sm font-semibold text-slate-900 block">
-                Browser Key-Value Storage
+              <span className="text-sm font-semibold text-[#172033] block">
+                Temporary Session Storage
               </span>
-              <span className="text-xs text-slate-500 font-mono">
-                {storageStatus.localStorageCount} localStorage keys · {storageStatus.sessionStorageCount} sessionStorage keys
+              <span className="text-xs text-[#586579]">
+                {storageStatus.localStorageCount} local storage items · {storageStatus.sessionStorageCount} session items
               </span>
             </div>
             <button
               onClick={handleClearStorageData}
-              className="btn-secondary text-xs py-1.5 px-3 shrink-0"
+              className="vg-btn-secondary text-xs sm:text-sm py-2 px-3.5 shrink-0"
             >
-              {clearedHistory ? '✓ Storage Cleared' : 'Clear Browser Storage'}
+              {clearedHistory ? '✓ Storage cleared' : 'Clear session data'}
             </button>
           </div>
         </div>

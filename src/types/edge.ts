@@ -17,6 +17,10 @@ export interface ForensicEvidenceItem {
   explanation: string;
   severity: 'pass' | 'warn' | 'fail';
   confidence: number;
+  // Human-centered 4-part breakdown
+  howChecked?: string;
+  whyItMatters?: string;
+  limitations?: string;
 }
 
 export interface OCRFields {

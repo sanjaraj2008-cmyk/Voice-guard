@@ -13,40 +13,40 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {/* Brand Column */}
           <div className="md:col-span-2 max-w-md">
             <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-[#2463a6] flex items-center justify-center text-white">
+              <div className="w-7 h-7 rounded-lg bg-[#315EFB] flex items-center justify-center text-white">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <span className="text-base font-bold text-slate-900">Voice Guard</span>
+              <span className="text-base font-bold text-[#172033]">Voice Guard</span>
             </div>
-            <p className="text-sm text-slate-600 leading-relaxed mb-4">
-              Document inspection and manipulation-risk screening. Runs locally in your browser using client-side canvas heuristics and in-browser neural networks.
+            <p className="text-sm text-[#586579] leading-relaxed mb-4">
+              Check document images for signs of tampering. Evaluates visual inconsistencies, image quality, and compression signals locally in your browser.
             </p>
-            <p className="text-xs text-slate-500">
-              Disclaimer: Voice Guard evaluates digital image anomalies and compression characteristics. It does not certify legal identity validity or replace physical forensic laboratory examination.
+            <p className="text-xs text-[#586579]/80 leading-relaxed">
+              Automated screening can make mistakes. A clean result does not guarantee that a document is genuine, and does not replace official verification by issuing authorities.
             </p>
           </div>
 
           {/* Navigation Links */}
           <div>
-            <span className="text-xs font-semibold text-slate-900 uppercase tracking-wider block mb-3">
-              Inspection Tools
+            <span className="text-xs font-semibold text-[#172033] uppercase tracking-wider block mb-3">
+              Screening Tools
             </span>
-            <ul className="space-y-2 text-sm text-slate-600">
+            <ul className="space-y-2 text-sm text-[#586579]">
               <li>
-                <button onClick={() => onNavigate('verify')} className="hover:text-[#2463a6] transition-colors cursor-pointer">
-                  Inspect a Document
+                <button onClick={() => onNavigate('verify')} className="hover:text-[#315EFB] transition-colors cursor-pointer">
+                  Check a Document
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('how-it-works')} className="hover:text-[#2463a6] transition-colors cursor-pointer">
-                  Technical Architecture
+                <button onClick={() => onNavigate('how-it-works')} className="hover:text-[#315EFB] transition-colors cursor-pointer">
+                  See How It Works
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('insights')} className="hover:text-[#2463a6] transition-colors cursor-pointer">
-                  Benchmark Evaluation
+                <button onClick={() => onNavigate('insights')} className="hover:text-[#315EFB] transition-colors cursor-pointer">
+                  Testing &amp; Accuracy Report
                 </button>
               </li>
             </ul>
@@ -54,18 +54,18 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
           {/* Privacy & Project */}
           <div>
-            <span className="text-xs font-semibold text-slate-900 uppercase tracking-wider block mb-3">
-              Integrity &amp; Privacy
+            <span className="text-xs font-semibold text-[#172033] uppercase tracking-wider block mb-3">
+              Trust &amp; Privacy
             </span>
-            <ul className="space-y-2 text-sm text-slate-600">
+            <ul className="space-y-2 text-sm text-[#586579]">
               <li>
-                <button onClick={() => onNavigate('security')} className="hover:text-[#2463a6] transition-colors cursor-pointer">
-                  Privacy Statement
+                <button onClick={() => onNavigate('security')} className="hover:text-[#315EFB] transition-colors cursor-pointer">
+                  Privacy Notice
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('settings')} className="hover:text-[#2463a6] transition-colors cursor-pointer">
-                  Local Storage Settings
+                <button onClick={() => onNavigate('settings')} className="hover:text-[#315EFB] transition-colors cursor-pointer">
+                  Browser Data Settings
                 </button>
               </li>
               <li>
@@ -73,7 +73,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                   href="https://github.com/sanjaraj2008-cmyk/Voice-guard" 
                   target="_blank" 
                   rel="noreferrer" 
-                  className="hover:text-[#2463a6] transition-colors inline-flex items-center gap-1"
+                  className="hover:text-[#315EFB] transition-colors inline-flex items-center gap-1"
                 >
                   <span>GitHub Repository</span>
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

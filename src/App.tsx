@@ -34,7 +34,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-slate-900 antialiased selection:bg-[#2463a6] selection:text-white">
+    <div className="min-h-screen flex flex-col bg-[#F7F8FA] text-[#172033] antialiased selection:bg-[#315EFB] selection:text-white font-sans">
       {/* Initialization & Pre-warming Screen */}
       {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
 

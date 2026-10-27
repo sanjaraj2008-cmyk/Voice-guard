@@ -5,34 +5,34 @@ import { docuGuardAI, AIModelPrediction } from './aiModel';
 export const getVerdictConfig = (verdict: VerdictType): VerdictConfig => {
   if (verdict === 'Real') {
     return {
-      hex: '#16a34a',
+      hex: '#15803d',
       glow: 'none',
       bg: '#f0fdf4',
       border: '#bbf7d0',
-      label: 'No supported manipulation indicators detected',
-      sub: 'Standard compression, edge profile, and metadata checks showed no obvious anomalies. Does not guarantee legal or physical authenticity.',
-      badge: 'NO INDICATORS FLAGGED'
+      label: 'No major warning signs found',
+      sub: 'The checks completed by this system did not find obvious image editing or compression anomalies. This is an automated screening result, not an official verification of legal validity.',
+      badge: 'No Major Warning Signs'
     };
   }
   if (verdict === 'Suspicious') {
     return {
-      hex: '#d97706',
+      hex: '#b45309',
       glow: 'none',
       bg: '#fffbeb',
       border: '#fde68a',
-      label: 'Inconclusive anomalies flagged — manual review recommended',
-      sub: 'Compression quantization variance, edge differences, or model classification probabilities warrant further verification.',
-      badge: 'MANUAL REVIEW RECOMMENDED'
+      label: 'Some unusual patterns found',
+      sub: 'The analysis flagged recompression differences, edge irregularities, or model signals that warrant closer review.',
+      badge: 'Needs Review'
     };
   }
   return {
-    hex: '#dc2626',
+    hex: '#b91c1c',
     glow: 'none',
     bg: '#fef2f2',
     border: '#fecaca',
-    label: 'Potential manipulation indicators found — manual review recommended',
-    sub: 'Significant compression variances, boundary step anomalies, or neural classification flags detected. Further manual inspection required.',
-    badge: 'POTENTIAL MANIPULATION'
+    label: 'Several warning signs need review',
+    sub: 'Significant compression discrepancies, boundary step anomalies, or strong neural tamper indicators were detected. Manual inspection is strongly recommended.',
+    badge: 'Review Strongly Recommended'
   };
 };
 
@@ -42,10 +42,10 @@ export const getVerdictConfig = (verdict: VerdictType): VerdictConfig => {
 export const SAMPLE_PRESETS: SampleDocPreset[] = [
   {
     id: 'clean-id',
-    label: 'Load sample clean document (Demo)',
-    color: '#16a34a',
+    label: 'Clean sample (Demonstration)',
+    color: '#15803d',
     bg: '#f0fdf4',
-    documentName: 'Sample_Clean_Document_Reference.png',
+    documentName: 'Clean_Sample_Document.png',
     score: 94,
     verdict: 'Real',
     fields: {
@@ -53,51 +53,42 @@ export const SAMPLE_PRESETS: SampleDocPreset[] = [
       documentId: '8492 1049 3921',
       dateOfBirth: '14/08/1992',
       gender: 'Male',
-      documentType: 'Aadhaar Card [Demo Reference]',
-      address: 'Plot 42, Vasant Vihar, New Delhi - 110057',
-      expiryDate: 'PERMANENT'
+      documentType: 'ID Card [Demonstration]'
     },
-    rawText: '[DEMO SAMPLE PRESET — FOR ILLUSTRATIVE DEMONSTRATION ONLY]\nGOVERNMENT OF INDIA\nUnique Identification Authority of India\nVikramaditya Sharma\nDOB: 14/08/1992 | Male\n8492 1049 3921',
+    rawText: '[SAMPLE DEMONSTRATION PRESET — ILLUSTRATIVE ONLY]\nVikramaditya Sharma\nDOB: 14/08/1992 | Male\nID: 8492 1049 3921',
     evidence: [
       {
         category: 'texture',
         weight: 35,
-        observation: 'Uniform micro-matte substrate raster profile',
-        explanation: 'What was checked: High-frequency raster grid analysis. Observed: No periodic screen Moiré pattern detected. Why it matters: Screen re-photography leaves distinct pixel pitch frequencies. Uncertainty: High-resolution e-ink or professional prints can also lack Moiré artifacts.',
+        observation: 'Uniform natural raster profile across the document surface',
+        explanation: 'Screening for periodic high-frequency interference found standard continuous falloff without display pixel grids.',
+        howChecked: '2D frequency distribution and sub-pixel pitch variance',
+        whyItMatters: 'Photographs taken off screens exhibit periodic Moiré bands that physical cards do not possess.',
+        limitations: 'High-resolution professional prints or high-DPI scans may also lack screen frequency artifacts.',
         severity: 'pass',
         confidence: 0.94
       },
       {
         category: 'compression',
-        weight: 20,
-        observation: 'Consistent JPEG quantization across macroblocks',
-        explanation: 'What was checked: 16x16 macroblock Error Level Analysis. Observed: Delta variance below 0.18. Why it matters: Resaving spliced regions typically causes local compression rate differences. Uncertainty: Uniformly recompressed whole-image saves can conceal local splices.',
+        weight: 25,
+        observation: 'Consistent compression characteristics across macroblocks',
+        explanation: 'Error Level Analysis (ELA) delta remains within uniform baseline bounds across the entire document.',
+        howChecked: '16x16 macroblock JPEG quantization delta against resave baseline',
+        whyItMatters: 'Locally spliced elements or altered dates usually introduce a secondary compression cycle.',
+        limitations: 'Uniformly resaved images can sometimes diminish localized error contrast.',
         severity: 'pass',
         confidence: 0.92
       },
       {
         category: 'metadata',
-        weight: 15,
-        observation: 'Standard camera profile without editor tag',
-        explanation: 'What was checked: EXIF / JFIF marker headers. Observed: No Photoshop, GIMP, or Canva software tags found. Why it matters: Common forgery tools leave identifying metadata signatures. Uncertainty: Metadata can easily be stripped or spoofed.',
+        weight: 20,
+        observation: 'Camera profile present without photo-editor signatures',
+        explanation: 'File headers contain standard capture tags without signatures from software like Photoshop or Canva.',
+        howChecked: 'Header scanning for EXIF, JFIF, and software creator markers',
+        whyItMatters: 'Editing software typically embeds identifier tags during export.',
+        limitations: 'Metadata can easily be removed or modified by messaging apps.',
         severity: 'pass',
         confidence: 0.88
-      },
-      {
-        category: 'layout',
-        weight: 15,
-        observation: 'Standard document geometry alignment',
-        explanation: 'What was checked: Aspect ratio and layout proportions. Observed: Matches standard ID card dimensions (85.6mm x 53.98mm ratio). Why it matters: Forged templates frequently distort border ratios.',
-        severity: 'pass',
-        confidence: 0.95
-      },
-      {
-        category: 'ocr',
-        weight: 15,
-        observation: 'Text checksums pass Verhoeff format check (Demo Reference)',
-        explanation: 'What was checked: Algorithmic Verhoeff checksum. Observed: Format conforms to standard 12-digit format. Why it matters: Verhoeff algorithm catches 100% of single-digit errors. Uncertainty: Valid checksum does not verify if the ID was legitimately issued.',
-        severity: 'pass',
-        confidence: 0.96
       }
     ],
     generateImage: () => {
@@ -112,7 +103,7 @@ export const SAMPLE_PRESETS: SampleDocPreset[] = [
       grad.addColorStop(1, '#e2e8f0');
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.roundRect(10, 10, 780, 480, 16);
+      ctx.roundRect(10, 10, 780, 480, 14);
       ctx.fill();
 
       ctx.strokeStyle = '#cbd5e1';
@@ -120,23 +111,19 @@ export const SAMPLE_PRESETS: SampleDocPreset[] = [
       ctx.stroke();
 
       ctx.fillStyle = '#ea580c';
-      ctx.fillRect(10, 10, 780, 10);
+      ctx.fillRect(10, 10, 780, 8);
       ctx.fillStyle = '#16a34a';
-      ctx.fillRect(10, 480, 780, 10);
+      ctx.fillRect(10, 482, 780, 8);
 
-      // Demo watermark banner
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = '#64748b';
       ctx.font = 'bold 12px sans-serif';
-      ctx.fillText('DEMO SAMPLE — ILLUSTRATIVE REFERENCE ONLY', 20, 36);
+      ctx.fillText('DEMONSTRATION SAMPLE — ILLUSTRATIVE PURPOSES ONLY', 20, 36);
 
       ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 20px sans-serif';
-      ctx.fillText('GOVERNMENT OF INDIA', 150, 70);
-      ctx.font = '600 13px sans-serif';
-      ctx.fillStyle = '#475569';
-      ctx.fillText('Unique Identification Authority of India', 150, 92);
+      ctx.fillText('GOVERNMENT IDENTITY CARD', 150, 70);
 
-      // Photo Box
+      // Photo
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(50, 120, 170, 220);
       ctx.fillStyle = '#38bdf8';
@@ -155,77 +142,53 @@ export const SAMPLE_PRESETS: SampleDocPreset[] = [
       ctx.fillStyle = '#334155';
       ctx.fillText('DOB: 14/08/1992', 260, 190);
       ctx.fillText('Gender: Male', 260, 225);
-      ctx.fillText('Address: Plot 42, Vasant Vihar, New Delhi', 260, 260);
+      ctx.fillText('Address: Sample Residential Sector, New Delhi', 260, 260);
 
       ctx.fillStyle = '#b91c1c';
       ctx.font = 'bold 26px monospace';
       ctx.fillText('8492  1049  3921', 260, 325);
-
-      // QR Box placeholder
-      ctx.fillStyle = '#020617';
-      ctx.fillRect(600, 120, 140, 140);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(610, 130, 40, 40);
-      ctx.fillRect(690, 130, 40, 40);
-      ctx.fillRect(610, 210, 40, 40);
-      ctx.fillStyle = '#020617';
-      ctx.fillRect(620, 140, 20, 20);
-      ctx.fillRect(700, 140, 20, 20);
-      ctx.fillRect(620, 220, 20, 20);
 
       return canvas.toDataURL('image/png');
     }
   },
   {
     id: 'suspicious-id',
-    label: 'Load sample suspicious document (Demo)',
-    color: '#d97706',
+    label: 'Suspicious sample (Demonstration)',
+    color: '#b45309',
     bg: '#fffbeb',
-    documentName: 'Sample_Suspicious_Document_Reference.png',
+    documentName: 'Suspicious_Sample_Document.png',
     score: 62,
     verdict: 'Suspicious',
     fields: {
       fullName: 'Rahul K. Verma [Sample]',
       documentId: '9182 4410 8823',
-      dateOfBirth: '22/11/1995',
+      dateOfBirth: '22/11/1995 (Edited region)',
       gender: 'Male',
-      documentType: 'Identity Card [Demo Reference]',
-      address: 'Flat 104, MG Road, Pune, Maharashtra',
-      expiryDate: 'PERMANENT'
+      documentType: 'ID Card [Demonstration]'
     },
-    rawText: '[DEMO SAMPLE PRESET — FOR ILLUSTRATIVE DEMONSTRATION ONLY]\nGOVERNMENT OF INDIA\nRahul K. Verma\nDOB: 22/11/1995\nWARNING: EXIF tool tag detected: Adobe Photoshop',
+    rawText: '[SAMPLE DEMONSTRATION PRESET — ILLUSTRATIVE ONLY]\nRahul K. Verma\nDOB: 22/11/1995\nNotice: Photo editor tag detected in metadata.',
     evidence: [
       {
         category: 'metadata',
         weight: 35,
-        observation: 'EXIF metadata indicates Adobe Photoshop processing',
-        explanation: 'What was checked: JPEG APP1 EXIF segment. Observed: "Adobe Photoshop CC" signature present. Why it matters: Native camera capture does not insert raster editing signatures. Uncertainty: Legitimate users sometimes crop or rotate images in Photoshop.',
+        observation: 'Photo-editing software tag detected in metadata (Adobe Photoshop)',
+        explanation: 'The image file contains metadata markers placed by Adobe Photoshop during export.',
+        howChecked: 'TIFF and EXIF metadata APP1 segment scan',
+        whyItMatters: 'Original camera captures do not naturally contain desktop photo editor signatures.',
+        limitations: 'A user may have innocently rotated or cropped a genuine scan in Photoshop.',
         severity: 'fail',
         confidence: 0.95
       },
       {
         category: 'compression',
         weight: 30,
-        observation: 'Elevated JPEG compression delta in text area',
-        explanation: 'What was checked: 16x16 macroblock ELA variance. Observed: Delta inconsistency of 0.48. Why it matters: Editing figures or dates introduces a second compression cycle. Uncertainty: Differential compression can also occur in composite scans.',
+        observation: 'Elevated compression delta around numeric date area',
+        explanation: 'Error Level Analysis reveals higher quantization error variance in the date box.',
+        howChecked: '16x16 macroblock recompression difference comparison',
+        whyItMatters: 'Saving a modified region twice causes it to compress differently from untouched background.',
+        limitations: 'Mixed text and graphic elements can produce natural baseline variance.',
         severity: 'warn',
         confidence: 0.74
-      },
-      {
-        category: 'texture',
-        weight: 20,
-        observation: 'Localized blur on numerical digits',
-        explanation: 'What was checked: Laplacian variance gradient. Observed: Sharpness drops 42% around the DOB string compared to surrounding text. Why it matters: Indicates possible clone-stamp or text insertion.',
-        severity: 'warn',
-        confidence: 0.68
-      },
-      {
-        category: 'ocr',
-        weight: 15,
-        observation: 'Text structure plausible but surrounded by artifacts',
-        explanation: 'What was checked: Font kerning consistency. Observed: Baseline misalignment of 2.1px. Uncertainty: Camera angle or page warp can cause apparent baseline drift.',
-        severity: 'warn',
-        confidence: 0.72
       }
     ],
     generateImage: () => {
@@ -237,21 +200,21 @@ export const SAMPLE_PRESETS: SampleDocPreset[] = [
 
       ctx.fillStyle = '#f8fafc';
       ctx.beginPath();
-      ctx.roundRect(10, 10, 780, 480, 16);
+      ctx.roundRect(10, 10, 780, 480, 14);
       ctx.fill();
       ctx.strokeStyle = '#d97706';
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      ctx.fillStyle = '#d97706';
+      ctx.fillStyle = '#b45309';
       ctx.font = 'bold 12px sans-serif';
-      ctx.fillText('DEMO SAMPLE — SUSPICIOUS REFERENCE ONLY', 20, 36);
+      ctx.fillText('DEMONSTRATION SAMPLE — SUSPICIOUS REFERENCE', 20, 36);
 
       ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 20px sans-serif';
-      ctx.fillText('GOVERNMENT OF INDIA', 150, 70);
+      ctx.fillText('GOVERNMENT IDENTITY CARD', 150, 70);
 
-      // Photo Box with slight misaligned border
+      // Photo
       ctx.fillStyle = '#1e293b';
       ctx.fillRect(50, 120, 170, 220);
       ctx.fillStyle = '#f59e0b';
@@ -265,7 +228,7 @@ export const SAMPLE_PRESETS: SampleDocPreset[] = [
 
       ctx.font = '500 15px sans-serif';
       ctx.fillStyle = '#334155';
-      ctx.fillText('DOB: 22/11/1995 (Edited area)', 260, 190);
+      ctx.fillText('DOB: 22/11/1995 (Altered text box)', 260, 190);
       ctx.fillText('Gender: Male', 260, 225);
 
       ctx.fillStyle = '#dc2626';
@@ -277,52 +240,41 @@ export const SAMPLE_PRESETS: SampleDocPreset[] = [
   },
   {
     id: 'tampered-id',
-    label: 'Load sample tampered document (Demo)',
-    color: '#dc2626',
+    label: 'Warning sample (Demonstration)',
+    color: '#b91c1c',
     bg: '#fef2f2',
-    documentName: 'Sample_Tampered_Screen_Capture.png',
+    documentName: 'Warning_Sample_Document.png',
     score: 28,
     verdict: 'Tampered',
     fields: {
       fullName: 'ALEXANDER ROY [Sample]',
       documentId: '0000 9999 8888',
       dateOfBirth: '01/01/2000',
-      gender: 'Male',
-      documentType: 'Counterfeit Sample [Demo Reference]'
+      documentType: 'Counterfeit Sample [Demonstration]'
     },
-    rawText: '[DEMO SAMPLE PRESET — FOR ILLUSTRATIVE DEMONSTRATION ONLY]\nCOUNTERFEIT SAMPLE\nALEXANDER ROY\n0000 9999 8888\nScreen re-photography detected via Moiré frequency grid',
+    rawText: '[SAMPLE DEMONSTRATION PRESET — ILLUSTRATIVE ONLY]\nALEXANDER ROY\n0000 9999 8888\nScreen re-photography pattern detected.',
     evidence: [
       {
         category: 'texture',
         weight: 40,
-        observation: 'Periodic Moiré sub-pixel frequency interference pattern detected',
-        explanation: 'What was checked: 2D FFT sub-pixel frequency spectrum. Observed: Strong periodic peak at LCD grid frequency. Why it matters: Physical identity cards do not exhibit electronic pixel pitch interference. Uncertainty: Cheap cameras photographing low-res prints can occasionally produce aliasing.',
+        observation: 'High-frequency screen Moiré pattern detected',
+        explanation: 'Periodic sub-pixel frequency interference pattern indicates this image was photographed off an electronic screen.',
+        howChecked: '2D frequency spectrum scanline energy analysis',
+        whyItMatters: 'Documents photographed from computer displays are often unauthorized presentations or forged digital files.',
+        limitations: 'Halftone security prints or high-contrast woven backdrops can occasionally cause frequency aliasing.',
         severity: 'fail',
         confidence: 0.96
       },
       {
         category: 'layout',
         weight: 30,
-        observation: 'Abrupt step-function photo boundary gradient',
-        explanation: 'What was checked: Boundary transition gradient around portrait frame. Observed: Sharp artificial edge indicating copy-paste composite. Why it matters: Legitimate documents exhibit unified printing raster without splice steps.',
+        observation: 'Sharp photo boundary contrast step',
+        explanation: 'Luminance transition gradient shows an abrupt border around the portrait area, typical of copy-paste composites.',
+        howChecked: 'Step-function edge gradient measurement around photo region',
+        whyItMatters: 'Genuine documents share a unified printing process across portrait and background.',
+        limitations: 'High-contrast frames on authentic IDs can produce strong boundary steps.',
         severity: 'fail',
         confidence: 0.91
-      },
-      {
-        category: 'compression',
-        weight: 20,
-        observation: 'Macroblock compression discontinuity across portrait region',
-        explanation: 'What was checked: JPEG ELA error difference. Observed: Discrepancy delta of 0.72 between inserted portrait and background.',
-        severity: 'fail',
-        confidence: 0.88
-      },
-      {
-        category: 'metadata',
-        weight: 10,
-        observation: 'Metadata stripped / missing camera sensor profile',
-        explanation: 'What was checked: EXIF IFD0 and ExifSubIFD segments. Observed: No sensor metadata or original capture timestamps found.',
-        severity: 'warn',
-        confidence: 0.75
       }
     ],
     generateImage: () => {
@@ -335,8 +287,7 @@ export const SAMPLE_PRESETS: SampleDocPreset[] = [
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, 800, 500);
 
-      // Draw simulated Moiré bands
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)';
       ctx.lineWidth = 1;
       for (let i = 0; i < 800; i += 4) {
         ctx.beginPath();
@@ -347,7 +298,7 @@ export const SAMPLE_PRESETS: SampleDocPreset[] = [
 
       ctx.fillStyle = '#ef4444';
       ctx.font = 'bold 12px sans-serif';
-      ctx.fillText('DEMO SAMPLE — TAMPERED / SCREEN CAPTURE ONLY', 20, 36);
+      ctx.fillText('DEMONSTRATION SAMPLE — WARNING REFERENCE', 20, 36);
 
       ctx.fillStyle = '#f8fafc';
       ctx.font = 'bold 22px sans-serif';
@@ -363,8 +314,8 @@ export const SAMPLE_PRESETS: SampleDocPreset[] = [
 ];
 
 /**
- * Runs the 100% in-browser client-side forensic inspection pipeline.
- * NO image data or document bytes are ever transmitted to any remote server.
+ * Runs the 100% in-browser client-side document screening pipeline.
+ * All operations execute in browser RAM; no image data is transmitted to any server.
  */
 export async function runEdgeVerificationPipeline(
   blob: Blob,
@@ -373,32 +324,30 @@ export async function runEdgeVerificationPipeline(
 ): Promise<DocumentVerificationData> {
   const imageBlobUrl = URL.createObjectURL(blob);
 
-  // Stage 01: Client-Side Ingestion
-  onProgress?.(1, '01. INGESTION & DECODING');
-  await new Promise(r => setTimeout(r, 120));
+  // Step 1: Loading your image
+  onProgress?.(1, 'Loading your image');
+  await new Promise(r => setTimeout(r, 140));
 
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const el = new Image();
     el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error('Failed to decode document image. Please verify file format.'));
+    el.onerror = () => reject(new Error('We could not read this image file. Please ensure it is a valid JPG, PNG, or WebP.'));
     el.src = imageBlobUrl;
   });
 
   const width = img.naturalWidth || img.width;
   const height = img.naturalHeight || img.height;
 
-  // Stage 02: Image Quality & Sharpness
-  onProgress?.(2, '02. IMAGE QUALITY & SHARPNESS');
-  await new Promise(r => setTimeout(r, 150));
+  // Step 2: Checking image quality
+  onProgress?.(2, 'Checking image quality');
+  await new Promise(r => setTimeout(r, 160));
 
   const pixelForensics = await analyzeImagePixelForensics(img);
 
-  // Stage 03: Error Level Analysis (ELA) Compression
-  onProgress?.(3, '03. ELA COMPRESSION ANALYSIS');
-  await new Promise(r => setTimeout(r, 180));
+  // Step 3: Examining possible inconsistencies
+  onProgress?.(3, 'Examining possible inconsistencies');
+  await new Promise(r => setTimeout(r, 200));
 
-  // Stage 04: Header & EXIF Metadata
-  onProgress?.(4, '04. METADATA & FORMAT INSPECTION');
   let exifPresent = false;
   let detectedSoftware: string | undefined = undefined;
   const exifAnomalies: string[] = [];
@@ -414,50 +363,50 @@ export async function runEdgeVerificationPipeline(
 
     if (/Adobe Photoshop|Photoshop/i.test(sliceText)) {
       detectedSoftware = 'Adobe Photoshop';
-      exifAnomalies.push('EXIF raster editing software tag detected (Adobe Photoshop)');
+      exifAnomalies.push('Image editing software tag found in metadata (Adobe Photoshop)');
     } else if (/GIMP/i.test(sliceText)) {
       detectedSoftware = 'GIMP Image Editor';
-      exifAnomalies.push('EXIF raster editing tag detected (GIMP)');
+      exifAnomalies.push('Image editing software tag found in metadata (GIMP)');
     } else if (/Canva/i.test(sliceText)) {
       detectedSoftware = 'Canva';
-      exifAnomalies.push('Compositing software signature detected (Canva)');
+      exifAnomalies.push('Compositing software signature found in metadata (Canva)');
     }
   } catch (err) {
     console.warn('Metadata inspection notice:', err);
   }
 
-  // Stage 05: In-Browser Neural Network Classifier
-  onProgress?.(5, '05. IN-BROWSER NEURAL INFERENCE');
+  // In-browser model inference
   let aiModelPrediction: AIModelPrediction | null = null;
-  let modelLoaded = false;
-
   try {
-    modelLoaded = await docuGuardAI.load();
+    const modelLoaded = await docuGuardAI.load();
     if (modelLoaded) {
       aiModelPrediction = await docuGuardAI.predict(img);
     }
   } catch (err) {
-    console.warn('[Voice Guard] In-browser model inference unavailable; evaluating pixel & metadata heuristics:', err);
+    console.warn('[Voice Guard] In-browser neural classifier unavailable; using pixel and metadata heuristics:', err);
   }
 
-  // Stage 06: Evidence Synthesis
-  onProgress?.(6, '06. COMPILING EVIDENCE FINDINGS');
-  await new Promise(r => setTimeout(r, 150));
+  // Step 4: Preparing the results
+  onProgress?.(4, 'Preparing the results');
+  await new Promise(r => setTimeout(r, 140));
 
-  // Build rigorous evidence items
   const evidence: ForensicEvidenceItem[] = [];
   let scorePenalties = 0;
 
-  // 1. Image Quality / Laplacian Sharpness
-  const blurScore = Math.min(1, pixelForensics.blurVariance / 300);
+  // 1. Image Quality / Laplacian Sharpness Check
   const qualityPassed = pixelForensics.qualityPassed;
+  const blurScore = Math.min(1, pixelForensics.blurVariance / 300);
+
   if (!qualityPassed) {
     scorePenalties += 15;
     evidence.push({
       category: 'texture',
       weight: 15,
-      observation: `Laplacian variance of ${pixelForensics.blurVariance.toFixed(1)} is below threshold (80.0)`,
-      explanation: 'What was checked: Second derivative (Laplacian) edge gradient variance. Observed: Low edge variance indicates diffuse or blurry image. Why it matters: Sub-threshold sharpness impairs fine raster and compression anomaly detection. Uncertainty: Motion blur or soft camera focus can occur naturally on authentic documents.',
+      observation: `Image sharpness measurement (${pixelForensics.blurVariance.toFixed(1)}) is below the recommended threshold (80.0)`,
+      explanation: 'The image has low edge contrast or noticeable blur. Reduced sharpness can make fine tampering indicators harder to evaluate.',
+      howChecked: 'Laplacian edge variance calculation across the full image bitmap',
+      whyItMatters: 'Adequate sharpness is required to differentiate legitimate focus falloff from synthetic blur or smoothing.',
+      limitations: 'Camera motion blur or soft focus on authentic documents can also trigger this warning.',
       severity: 'warn',
       confidence: 0.85
     });
@@ -465,22 +414,28 @@ export async function runEdgeVerificationPipeline(
     evidence.push({
       category: 'texture',
       weight: 15,
-      observation: `Sharpness measurement: Laplacian variance ${pixelForensics.blurVariance.toFixed(1)} (sufficient)`,
-      explanation: 'What was checked: Laplacian edge variance. Observed: Sufficient sharpness across micro-edges for downstream analysis. Why it matters: Adequate sharpness enables reliable compression and raster inspection.',
+      observation: `Image sharpness is sufficient for analysis (Laplacian variance: ${pixelForensics.blurVariance.toFixed(1)})`,
+      explanation: 'Edge transitions are sharp and clear, allowing reliable compression and texture evaluation.',
+      howChecked: 'Laplacian edge variance filter across edge gradients',
+      whyItMatters: 'Clean edges provide clear signals for detecting compression discrepancies and Moiré patterns.',
+      limitations: 'Sufficient sharpness alone does not prove that an image has not been edited.',
       severity: 'pass',
       confidence: 0.92
     });
   }
 
-  // 2. Error Level Analysis (ELA) Compression Inconsistency
+  // 2. Error Level Analysis (ELA) Compression Discrepancies
   const compressionDelta = pixelForensics.compressionInconsistency;
   if (compressionDelta > 0.45) {
     scorePenalties += 35;
     evidence.push({
       category: 'compression',
       weight: 25,
-      observation: `Unusual recompression delta across macroblocks (${(compressionDelta * 100).toFixed(0)}%)`,
-      explanation: 'What was checked: 16x16 macroblock JPEG Error Level Analysis against 75% quality resave baseline. Observed: Disproportionate delta in specific macroblock clusters. Why it matters: Spliced or edited regions often exhibit divergent recompression rates compared to the background. Uncertainty: Documents with mixed graphics, scanned text, and photo elements naturally show baseline variation.',
+      observation: `Unusual compression differences found across macroblock sections (${(compressionDelta * 100).toFixed(0)}% delta)`,
+      explanation: 'Certain regions of the image exhibit higher compression differences than the rest of the document.',
+      howChecked: '16x16 macroblock JPEG Error Level Analysis compared against a 75% baseline resave',
+      whyItMatters: 'When text or photos are digitally inserted, they frequently carry a different compression history than the background.',
+      limitations: 'Documents with varied graphical elements, logos, or scanned stamps can naturally show minor compression variance.',
       severity: 'warn',
       confidence: 0.84
     });
@@ -488,21 +443,27 @@ export async function runEdgeVerificationPipeline(
     evidence.push({
       category: 'compression',
       weight: 25,
-      observation: `Uniform compression delta across macroblocks (${(compressionDelta * 100).toFixed(0)}%)`,
-      explanation: 'What was checked: JPEG ELA macroblock quantization consistency. Observed: Error delta remains within expected distribution throughout the image surface. Why it matters: Consistent error levels indicate the document was saved in a single uniform compression pass.',
+      observation: `Compression levels appear uniform across the document (${(compressionDelta * 100).toFixed(0)}% delta)`,
+      explanation: 'The compression error rate remains consistent across the entire image surface.',
+      howChecked: 'Error Level Analysis measuring quantization consistency across 16x16 pixel blocks',
+      whyItMatters: 'A uniform error distribution suggests the document was saved in a single consistent pass.',
+      limitations: 'Saving an entire composite image once at high compression can sometimes conceal regional differences.',
       severity: 'pass',
       confidence: 0.90
     });
   }
 
-  // 3. Screen Re-photography / Sub-pixel frequency check
+  // 3. Screen Re-photography Pattern Check
   if (pixelForensics.isScreenRephoto) {
     scorePenalties += 40;
     evidence.push({
       category: 'texture',
       weight: 30,
-      observation: `High-frequency Moiré pattern detected (${(pixelForensics.moireScore * 100).toFixed(0)}% frequency peak)`,
-      explanation: 'What was checked: 2D spatial frequency distribution for periodic sub-pixel pitch interference. Observed: Repetitive sinusoidal peaks characteristic of electronic displays. Why it matters: Indicates the image is a photograph of an LCD/OLED screen rather than an original document. Uncertainty: Fine woven security patterns or halftone printing grids can sometimes trigger false positives.',
+      observation: `High-frequency periodic pattern detected (${(pixelForensics.moireScore * 100).toFixed(0)}% signal strength)`,
+      explanation: 'A repetitive frequency pattern typical of photographing an electronic screen (LCD/OLED) was found.',
+      howChecked: 'Sub-pixel spatial frequency analysis for periodic scanline interference',
+      whyItMatters: 'Legitimate identity verification generally requires photos of physical cards rather than pictures of screens.',
+      limitations: 'Fine woven fabric backgrounds or halftone security printing can occasionally produce similar frequency interference.',
       severity: 'fail',
       confidence: pixelForensics.moireScore
     });
@@ -510,21 +471,27 @@ export async function runEdgeVerificationPipeline(
     evidence.push({
       category: 'texture',
       weight: 20,
-      observation: 'No periodic screen Moiré interference patterns detected',
-      explanation: 'What was checked: Sub-pixel spatial frequency analysis. Observed: Continuous natural frequency falloff without discrete electronic display peaks.',
+      observation: 'No periodic screen display patterns detected',
+      explanation: 'The frequency profile displays natural continuous falloff without electronic display pixel grids.',
+      howChecked: '2D frequency spectrum analysis across horizontal and vertical scanlines',
+      whyItMatters: 'Confirms absence of typical electronic monitor interference patterns.',
+      limitations: 'High-resolution professional scans of displays can sometimes minimize visible screen lines.',
       severity: 'pass',
       confidence: 0.92
     });
   }
 
-  // 4. Metadata & Editing Software Signatures
+  // 4. File Metadata Signatures
   if (detectedSoftware) {
     scorePenalties += 25;
     evidence.push({
       category: 'metadata',
       weight: 20,
-      observation: `EXIF software tag detected: ${detectedSoftware}`,
-      explanation: `What was checked: TIFF/EXIF header metadata tables. Observed: Image contains processing tag from ${detectedSoftware}. Why it matters: Direct camera capture or scanning does not insert photo-editing software signatures. Uncertainty: Some users innocently open images to crop, rotate, or compress without altering document text.`,
+      observation: `Photo-editing software signature found: ${detectedSoftware}`,
+      explanation: `The file header contains metadata written by ${detectedSoftware}.`,
+      howChecked: 'Inspection of JPEG APP1 and TIFF EXIF metadata segments in the initial 64KB',
+      whyItMatters: 'Standard camera apps and scanners do not inject photo editing software tags.',
+      limitations: 'Someone may have used editing software simply to crop or rotate an authentic document scan.',
       severity: 'fail',
       confidence: 0.98
     });
@@ -532,24 +499,29 @@ export async function runEdgeVerificationPipeline(
     evidence.push({
       category: 'metadata',
       weight: 15,
-      observation: exifPresent ? 'EXIF segment present without known editing software tags' : 'Metadata tables absent or stripped',
-      explanation: 'What was checked: EXIF / JFIF headers. Observed: No photo-editing software signatures identified. Uncertainty: Metadata is easily stripped or modified by messaging apps and social media.',
+      observation: exifPresent ? 'Camera metadata profile found without editing software tags' : 'Metadata stripped or unavailable',
+      explanation: 'No known photo-editing software signatures were identified in the file headers.',
+      howChecked: 'Header scan for software creator tags and EXIF camera tables',
+      whyItMatters: 'Absence of editor tags indicates standard file creation.',
+      limitations: 'Metadata is easily stripped or modified by social messaging apps (WhatsApp, Telegram).',
       severity: 'pass',
       confidence: 0.85
     });
   }
 
-  // 5. In-Browser Neural Classifier (Trained CNN)
+  // 5. In-Browser Neural Network Tamper Assessment
   if (aiModelPrediction) {
     const [pReal, pSuspicious, pTampered] = aiModelPrediction.probabilities;
-    const aiPenalty = Math.round(aiModelPrediction.forgeryScore * 0.5);
-    scorePenalties += aiPenalty;
+    scorePenalties += Math.round(aiModelPrediction.forgeryScore * 0.45);
 
     evidence.push({
       category: 'layout',
       weight: 25,
-      observation: `In-browser neural classifier (1.03M params): ${(Math.max(...aiModelPrediction.probabilities) * 100).toFixed(1)}% confidence in '${aiModelPrediction.verdict}' classification`,
-      explanation: `What was checked: Multi-scale convolutional features trained on IMD2020 & AIForge document tampering datasets (66.5% validation accuracy). Observed probabilities: Real ${(pReal * 100).toFixed(1)}%, Suspicious ${(pSuspicious * 100).toFixed(1)}%, Tampered ${(pTampered * 100).toFixed(1)}%. Uncertainty: Model evaluated on academic benchmarks; accuracy on novel, out-of-distribution real-world document formats may vary.`,
+      observation: `Neural classifier assessment: ${(Math.max(...aiModelPrediction.probabilities) * 100).toFixed(0)}% confidence in '${aiModelPrediction.verdict}' category`,
+      explanation: `In-browser convolutional model evaluated learned visual features (Real: ${(pReal * 100).toFixed(0)}%, Suspicious: ${(pSuspicious * 100).toFixed(0)}%, Tampered: ${(pTampered * 100).toFixed(0)}%).`,
+      howChecked: 'TensorFlow.js convolutional neural network (1.03M parameters) trained on IMD2020 and AIForge datasets',
+      whyItMatters: 'Neural models can detect complex multi-scale texture and blending anomalies that manual rules miss.',
+      limitations: 'Model evaluated on academic datasets (66.5% validation accuracy). Real-world novel document layouts may produce uncertainty.',
       severity: pTampered > 0.5 ? 'fail' : pSuspicious > 0.4 ? 'warn' : 'pass',
       confidence: Math.max(...aiModelPrediction.probabilities)
     });
@@ -557,19 +529,25 @@ export async function runEdgeVerificationPipeline(
     evidence.push({
       category: 'layout',
       weight: 15,
-      observation: 'In-browser neural model not loaded; evaluation grounded strictly in pixel & metadata heuristics',
-      explanation: 'What was checked: TensorFlow.js model status. Observed: Neural weights unavailable or disabled. All reported findings represent deterministic canvas mathematical heuristics.',
+      observation: 'In-browser neural model not active; findings are based strictly on pixel and metadata heuristics',
+      explanation: 'The neural network model could not be initialized. All findings reflect mathematical canvas checks.',
+      howChecked: 'TensorFlow.js model availability check',
+      whyItMatters: 'Informs you that neural texture classification was omitted from this run.',
+      limitations: 'Only rule-based heuristics were evaluated.',
       severity: 'warn',
       confidence: 0.70
     });
   }
 
-  // 6. Identity & Structure Verification Check (Explicitly marked as not checked)
+  // 6. Transparent Disclosure of Unsupported / Skipped Checks
   evidence.push({
     category: 'ocr',
     weight: 0,
-    observation: 'Text extraction, QR cryptographic signature, and template validation: NOT CHECKED',
-    explanation: 'What was checked: Document structure & PKI signatures. Observed: No local OCR engine, PKI root-of-trust validator, or government registry integration is active on this file. Why it matters: Integrity screening detects image manipulation; it does NOT verify whether the identity actually exists or was legitimately issued.',
+    observation: 'Government registry lookup and cryptographic QR signature check: NOT CHECKED',
+    explanation: 'Voice Guard checks for digital image manipulation only. It does not connect to government databases or verify cryptographic issuer certificates.',
+    howChecked: 'Service capability disclosure',
+    whyItMatters: 'A document can be digitally unedited but still contain false or fabricated identity information.',
+    limitations: 'Cannot confirm if an individual legitimately exists or if a card was officially issued.',
     severity: 'warn',
     confidence: 1.0
   });
@@ -585,8 +563,8 @@ export async function runEdgeVerificationPipeline(
     verdict,
     imageBlobUrl,
     boundaryConfidence: qualityPassed ? 0.88 : 0.65,
-    qr: null, // Truthful: No QR signature verification was performed
-    faceRegion: null, // Truthful: No face detection box was computed
+    qr: null,
+    faceRegion: null,
     compressionArtifacts: {
       inconsistencyScore: pixelForensics.compressionInconsistency
     },
@@ -602,8 +580,8 @@ export async function runEdgeVerificationPipeline(
     },
     ocr: {
       confidence: 0,
-      fields: {}, // Truthful: No fabricated names or numbers for real uploaded documents
-      rawText: 'No local OCR engine run on this document.'
+      fields: {}, // Never fabricate names or data for real uploads
+      rawText: 'No text extraction was performed on this file.'
     },
     evidence
   };

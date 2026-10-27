@@ -22,18 +22,18 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
   pdf.rect(14, 12, 182, 28, 'FD');
 
   // Brand title
-  pdf.setTextColor(36, 99, 166); // #2463a6
+  pdf.setTextColor(49, 94, 251); // #315EFB
   pdf.setFontSize(14);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Voice Guard — Document Inspection Report', 20, 22);
+  pdf.text('Voice Guard — Document Screening Report', 20, 22);
 
-  pdf.setTextColor(71, 85, 105);
+  pdf.setTextColor(88, 101, 121); // #586579
   pdf.setFontSize(8);
   pdf.setFont('helvetica', 'normal');
   pdf.text(`Document Reference: ${data.documentId}`, 20, 29);
   pdf.text(`File Name: ${data.fileName}`, 20, 34);
-  pdf.text(`Inspected: ${new Date(data.generatedAt).toUTCString()}`, 110, 29);
-  pdf.text('Evaluation Mode: In-Browser Client-Side Engine', 110, 34);
+  pdf.text(`Screened: ${new Date(data.generatedAt).toUTCString()}`, 110, 29);
+  pdf.text('Processing: 100% Client-Side In-Browser Analysis', 110, 34);
 
   // Verdict Summary Card
   let p = 46;
@@ -117,21 +117,21 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
   pdf.setLineWidth(0.3);
   pdf.line(14, footerY, 196, footerY);
 
-  pdf.setTextColor(148, 163, 184);
+  pdf.setTextColor(100, 116, 139);
   pdf.setFontSize(6.5);
   pdf.setFont('helvetica', 'normal');
   pdf.text(
-    'Notice & Disclaimer: This inspection report was generated locally in the browser sandbox. Voice Guard evaluates digital image anomalies and compression characteristics.',
+    'Notice: Automated screening can make mistakes. A clean result does not guarantee that a document is genuine.',
     14,
     footerY + 4
   );
   pdf.text(
-    'It does not certify government identity validity, legal authenticity, or replace laboratory physical document inspection.',
+    'This report evaluates visual inconsistencies and digital compression characteristics locally in your browser. It is not an official certificate of authenticity.',
     14,
     footerY + 8
   );
 
-  pdf.text('Voice Guard Project · In-Browser Document Forensics', 105, footerY + 14, { align: 'center' });
+  pdf.text('Voice Guard · Document Image Screening Tool', 105, footerY + 14, { align: 'center' });
 
   // Save PDF
   pdf.save(`VoiceGuard_Inspection_${data.documentId}.pdf`);
