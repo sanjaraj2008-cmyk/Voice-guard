@@ -41,15 +41,6 @@ export default function App() {
       {/* Navigation Bar */}
       <Navbar currentPage={currentPage} onNavigate={handleNavigate} />
 
-      {/* Floating Connected Test Indicator */}
-      <div className="fixed bottom-8 right-8 z-[9999] flex items-center gap-3 px-5 py-3 rounded-full bg-emerald-950/90 border-2 border-emerald-400 text-emerald-300 shadow-[0_0_30px_rgba(16,185,129,0.7)] backdrop-blur-xl font-mono text-base font-extrabold tracking-wider animate-bounce select-none pointer-events-auto">
-        <span className="relative flex h-3.5 w-3.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
-        </span>
-        <span className="drop-shadow-[0_0_8px_#34d399]">CONNECTED</span>
-      </div>
-
       {/* Main Routed Page Content */}
       <div className="flex-1 flex flex-col">
         {currentPage === 'home' && <HomePage onNavigate={handleNavigate} />}

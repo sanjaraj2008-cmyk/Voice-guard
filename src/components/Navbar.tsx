@@ -47,10 +47,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate }) => {
           <span className="text-lg font-bold" style={{ color: '#f8fafc' }}>
             DocuGuard <span style={{ color: '#e879f9', fontWeight: 300 }}>Edge</span>
           </span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.3)]">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-            CONNECTED
-          </span>
         </button>
 
         {/* Desktop Nav Links */}
