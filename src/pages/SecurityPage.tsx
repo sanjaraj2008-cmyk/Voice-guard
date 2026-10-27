@@ -7,109 +7,116 @@ interface SecurityPageProps {
 
 export const SecurityPage: React.FC<SecurityPageProps> = ({ onNavigate }) => {
   return (
-    <main className="min-h-screen pb-20 relative">
-      <div 
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[450px] pointer-events-none"
-        style={{
-          background: 'radial-gradient(circle at 50% 20%, rgba(16, 185, 129, 0.12) 0%, transparent 70%)',
-          filter: 'blur(60px)'
-        }}
-      />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-bold tracking-[0.25em] uppercase mb-3 glass">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10b981' }} />
-            <span style={{ color: '#10b981' }}>ZERO-KNOWLEDGE VERIFICATION ARCHITECTURE</span>
+    <main className="min-h-screen pb-16 bg-[#F8FAFC]">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+        {/* Header */}
+        <div className="mb-10 text-center max-w-2xl mx-auto">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 mb-3">
+            <span>Privacy &amp; Data Policy</span>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight mb-4">
-            Your Identity Should <span className="text-emerald-400">Stay Yours.</span>
+          <h1 className="text-3xl font-bold text-slate-900 mb-3">
+            Client-Side Privacy Architecture
           </h1>
-          <p className="text-lg text-slate-400 font-light max-w-2xl mx-auto leading-relaxed">
-            DocuGuard Edge is built on a Zero-Knowledge Architecture. We bring the verification intelligence to the data, not the data to the intelligence.
+          <p className="text-sm text-slate-600 leading-relaxed">
+            A precise disclosure of data handling, network behavior, browser storage, and operational boundaries.
           </p>
         </div>
 
-        {/* 3 Privacy Pillars */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto mb-16">
-          <div className="glass p-8 rounded-2xl">
-            <h3 className="text-lg font-bold text-white mb-3">Local Processing Only</h3>
-            <p className="text-sm text-slate-400 leading-relaxed font-light">
-              Document binaries are parsed entirely client-side using JavaScript File APIs. No network requests are made containing your personal identity data.
+        {/* 3 Truthful Pillars */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="surface-card p-5 rounded-xl border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-900 mb-2">
+              In-Memory Processing
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              When an image is dropped or selected, it is decoded into browser RAM via the HTML5 File API and Canvas 2D context. It is never uploaded to an external server.
             </p>
           </div>
 
-          <div className="glass p-8 rounded-2xl">
-            <h3 className="text-lg font-bold text-white mb-3">Minimal Data Exposure</h3>
-            <p className="text-sm text-slate-400 leading-relaxed font-light">
-              Even locally, the AI models only extract the exact features required to compute a Trust Score. We do not persist PII in local storage.
+          <div className="surface-card p-5 rounded-xl border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-900 mb-2">
+              Zero Cloud Ingestion
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              All pixel calculations (Laplacian blur, JPEG ELA) and neural network inference (TensorFlow.js) execute within your device's browser sandbox.
             </p>
           </div>
 
-          <div className="glass p-8 rounded-2xl">
-            <h3 className="text-lg font-bold text-white mb-3">Explainable Risk Signals</h3>
-            <p className="text-sm text-slate-400 leading-relaxed font-light">
-              Our models produce transparent, deterministic signals. You always know exactly which anomaly triggered a high-risk score.
+          <div className="surface-card p-5 rounded-xl border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-900 mb-2">
+              Transient Data Lifecycle
+            </h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Document data is discarded upon refreshing or navigating away. No images, personal details, or inspection dossiers are stored in permanent browser databases.
             </p>
           </div>
         </div>
 
-        {/* Zero-Knowledge Architecture Workflow */}
-        <div className="glass p-10 rounded-3xl max-w-5xl mx-auto mb-20 text-center relative overflow-hidden">
-          <h2 className="text-2xl font-bold text-white mb-8">Zero-Knowledge Architecture Workflow</h2>
+        {/* Technical Data Flow Table */}
+        <div className="surface-card p-6 rounded-xl border border-slate-200 mb-8">
+          <h2 className="text-base font-bold text-slate-900 mb-4">
+            Technical Data Flow Specification
+          </h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-center">
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
-              <span className="font-mono text-cyan-400 font-bold block mb-1">01. INGESTION</span>
-              <span className="font-semibold text-white">User Device (Browser)</span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
-              <span className="font-mono text-purple-400 font-bold block mb-1">02. EXTRACTION</span>
-              <span className="font-semibold text-white">Local OCR &amp; AI (WASM)</span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-xs">
-              <span className="font-mono text-fuchsia-400 font-bold block mb-1">03. AUDIT</span>
-              <span className="font-semibold text-white">Forensic Inspection</span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-emerald-500/40 text-xs bg-emerald-950/20">
-              <span className="font-mono text-emerald-400 font-bold block mb-1">04. DECISION</span>
-              <span className="font-semibold text-emerald-300">0 Server Uploads</span>
-            </div>
+          <div className="overflow-x-auto text-xs">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500 font-mono">
+                  <th className="py-2.5 pr-4 font-semibold">STAGE</th>
+                  <th className="py-2.5 pr-4 font-semibold">DATA TYPE</th>
+                  <th className="py-2.5 pr-4 font-semibold">LOCATION</th>
+                  <th className="py-2.5 font-semibold">NETWORK CALL</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                <tr>
+                  <td className="py-2.5 pr-4 text-slate-900 font-semibold">Image Ingestion</td>
+                  <td className="py-2.5 pr-4 text-slate-600">File Blob (Binary)</td>
+                  <td className="py-2.5 pr-4 text-slate-600">Browser Memory (RAM)</td>
+                  <td className="py-2.5 text-emerald-600 font-bold">None (0 bytes sent)</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 pr-4 text-slate-900 font-semibold">Model Weight Load</td>
+                  <td className="py-2.5 pr-4 text-slate-600">TF.js model.json + Shard</td>
+                  <td className="py-2.5 pr-4 text-slate-600">Static Host / Vercel CDN</td>
+                  <td className="py-2.5 text-slate-600">GET /ai-model/*.bin (Once, cached)</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 pr-4 text-slate-900 font-semibold">Pixel Forensics</td>
+                  <td className="py-2.5 pr-4 text-slate-600">ImageData (RGBA)</td>
+                  <td className="py-2.5 pr-4 text-slate-600">Canvas 2D Context</td>
+                  <td className="py-2.5 text-emerald-600 font-bold">None (0 bytes sent)</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 pr-4 text-slate-900 font-semibold">Neural Inference</td>
+                  <td className="py-2.5 pr-4 text-slate-600">224x224x3 Tensor</td>
+                  <td className="py-2.5 pr-4 text-slate-600">WebGL / WASM Texture Buffer</td>
+                  <td className="py-2.5 text-emerald-600 font-bold">None (0 bytes sent)</td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 pr-4 text-slate-900 font-semibold">Report Generation</td>
+                  <td className="py-2.5 pr-4 text-slate-600">PDF Document</td>
+                  <td className="py-2.5 pr-4 text-slate-600">Local Blob Download</td>
+                  <td className="py-2.5 text-emerald-600 font-bold">None (0 bytes sent)</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Threat Intelligence Model (8 Vectors) */}
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-white mb-2">Threat Intelligence Model</h2>
-            <p className="text-slate-400 text-sm">DocuGuard Edge is specifically trained to identify multiple vectors of identity fraud.</p>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            {[
-              'Edited Documents',
-              'Synthetic Identities',
-              'Image Manipulation',
-              'Inconsistent Typography',
-              'Suspicious Metadata',
-              'Photo Replacement',
-              'Layout Tampering',
-              'Low-confidence OCR'
-            ].map((threat) => (
-              <div key={threat} className="glass p-3.5 rounded-xl text-center border-slate-800">
-                <span className="font-bold text-slate-200">{threat}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-center mt-12">
-            <button
-              onClick={() => onNavigate('verify')}
-              className="btn-primary cursor-pointer text-sm"
-            >
-              Experience Secure Verification
-            </button>
-          </div>
+        {/* Verification Limitations */}
+        <div className="surface-card p-6 rounded-xl border border-slate-200">
+          <h3 className="text-sm font-bold text-slate-900 mb-2">
+            Verification Boundaries &amp; Integrity Disclaimer
+          </h3>
+          <p className="text-xs text-slate-600 leading-relaxed mb-3">
+            Because Voice Guard operates entirely on the client side without central database connections, it screens for digital and visual manipulation only.
+          </p>
+          <ul className="space-y-1.5 text-xs text-slate-600 list-disc list-inside">
+            <li>Voice Guard cannot verify whether an individual's personal identity records are genuine or counterfeit in government registries.</li>
+            <li>Voice Guard cannot detect authentic paper documents that were physically modified prior to high-resolution direct scanning.</li>
+            <li>Findings should be treated as diagnostic risk indicators to guide human review, not as autonomous legal proof.</li>
+          </ul>
         </div>
       </div>
     </main>

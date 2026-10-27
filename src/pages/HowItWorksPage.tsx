@@ -7,131 +7,142 @@ interface HowItWorksPageProps {
 
 export const HowItWorksPage: React.FC<HowItWorksPageProps> = ({ onNavigate }) => {
   return (
-    <main className="min-h-screen pb-20 relative">
-      {/* Background glow */}
-      <div 
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[450px] pointer-events-none"
-        style={{
-          background: 'radial-gradient(circle at 50% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 70%)',
-          filter: 'blur(60px)'
-        }}
-      />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16">
+    <main className="min-h-screen pb-16 bg-[#F8FAFC]">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-20">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight mb-4">
-            From document image to <span className="text-purple-400">trust decision.</span>
+        <div className="mb-10 text-center max-w-2xl mx-auto">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 mb-3">
+            <span>Engineering Architecture</span>
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-3">
+            How Voice Guard Works
           </h1>
-          <p className="text-lg text-slate-400 font-light max-w-2xl mx-auto leading-relaxed">
-            Explore the internal pipeline of DocuGuard Edge. A six-stage process that runs entirely inside your browser.
+          <p className="text-sm text-slate-600 leading-relaxed">
+            A transparent overview of the in-browser inspection pipeline, heuristic algorithms, neural architecture, and current operating limitations.
           </p>
         </div>
 
-        {/* 3 Pipeline Deep Dive Stages */}
-        <div className="space-y-16 max-w-4xl mx-auto">
-          {/* Stage 01 & 02 */}
-          <div className="glass p-8 md:p-10 rounded-3xl relative overflow-hidden">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                STAGE 01 &amp; 02
-              </span>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Ingestion &amp; OCR Engine
-              </span>
+        {/* Pipeline Architecture Diagram */}
+        <div className="surface-card p-6 sm:p-8 rounded-xl border border-slate-200 mb-10">
+          <h2 className="text-base font-bold text-slate-900 mb-6">
+            Client-Side Execution Flow
+          </h2>
+
+          <div className="space-y-6">
+            {/* Step 1 */}
+            <div className="flex items-start gap-4">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2463a6] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-blue-200">
+                01
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                  Local Ingestion &amp; Canvas Bitmap Decoding
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  The document is loaded directly into browser memory as a Blob via the HTML5 File API. An offscreen <code>HTMLCanvasElement</code> decodes the raster bitmap at natural resolution. No network socket or API payload is initiated.
+                </p>
+              </div>
             </div>
 
-            <h3 className="text-2xl font-bold text-white mb-4">
-              Capture &amp; OCR Understanding
-            </h3>
-            <p className="text-slate-300 text-sm md:text-base leading-relaxed mb-6 font-light">
-              Documents are loaded securely into browser memory as Blobs. WebAssembly-powered Tesseract OCR scans the image locally to extract critical text, dates, and identification numbers without any network latency.
-            </p>
+            {/* Step 2 */}
+            <div className="flex items-start gap-4">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2463a6] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-blue-200">
+                02
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                  Laplacian Edge Variance (Sharpness Filter)
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Convolves the grayscale image against a discrete 3x3 Laplacian kernel <code>[0, 1, 0; 1, -4, 1; 0, 1, 0]</code> to calculate edge variance. Documents below threshold (80.0) are flagged for blur, as diffuse edges can obscure secondary manipulation.
+                </p>
+              </div>
+            </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">
-                Extracted Entities &amp; Structure:
-              </span>
-              <div className="flex flex-wrap gap-2 text-xs">
-                {['Name & Date of Birth', 'Document Identification Number', 'Expiry & Issue Dates', 'Address Information', 'OCR Confidence Baseline'].map((tag) => (
-                  <span key={tag} className="px-2.5 py-1 rounded-md bg-purple-900/30 text-purple-300 border border-purple-700/40 font-mono">
-                    {tag}
-                  </span>
-                ))}
+            {/* Step 3 */}
+            <div className="flex items-start gap-4">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2463a6] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-blue-200">
+                03
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                  Error Level Analysis (ELA) Compression Discrepancy
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  The canvas exports a temporary 75% quality JPEG in memory. The pixel delta between original and recompressed frames is computed across 16x16 macroblocks. Locally altered areas (e.g. spliced text or modified dates) often display higher error variance.
+                </p>
+              </div>
+            </div>
+
+            {/* Step 4 */}
+            <div className="flex items-start gap-4">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2463a6] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-blue-200">
+                04
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                  In-Browser Convolutional Neural Network (TensorFlow.js)
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  The image is resized to 224x224 and fed to a 1.03M parameter convolutional neural network running on the browser's WebGL / WASM backend. Trained on 2,374 forensic samples from IMD2020 and AIForge datasets to output classification probabilities for Real, Suspicious, or Tampered.
+                </p>
+              </div>
+            </div>
+
+            {/* Step 5 */}
+            <div className="flex items-start gap-4">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#2463a6] font-mono text-xs font-bold flex items-center justify-center shrink-0 border border-blue-200">
+                05
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-slate-900 mb-1">
+                  EXIF &amp; Binary Header Inspection
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  The initial 64KB binary segment is scanned for JPEG APP1 markers and TIFF tags to verify whether the image retains standard camera metadata or contains signatures inserted by photo-editing tools like Adobe Photoshop, GIMP, or Canva.
+                </p>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Stage 03 & 04 */}
-          <div className="glass p-8 md:p-10 rounded-3xl relative overflow-hidden">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">
-                STAGE 03 &amp; 04
-              </span>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Forensics &amp; Texture Detection
-              </span>
-            </div>
-
-            <h3 className="text-2xl font-bold text-white mb-4">
-              Visual Intelligence &amp; Forensics
+        {/* Model Specs & Limitations */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+          <div className="surface-card p-5 rounded-xl border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-900 mb-2">
+              Neural Network Architecture
             </h3>
-            <p className="text-slate-300 text-sm md:text-base leading-relaxed mb-6 font-light">
-              The system goes beyond reading text. It analyzes the document&apos;s physical characteristics, looking for digital tampering, layout anomalies, and inconsistent image artifacts.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-cyan-400 font-bold block mb-1">Moiré &amp; Texture Analysis</span>
-                <span className="text-slate-400">Detects screen re-photography patterns when an ID is photographed off a computer display.</span>
-              </div>
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-purple-400 font-bold block mb-1">Compression Anomalies</span>
-                <span className="text-slate-400">Error Level Analysis checks for secondary quantization tables where text or photos were spliced.</span>
-              </div>
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-emerald-400 font-bold block mb-1">EXIF Metadata Scanner</span>
-                <span className="text-slate-400">Examines binary tags for digital editors (Photoshop, GIMP) and missing camera sensors.</span>
-              </div>
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-amber-400 font-bold block mb-1">Layout &amp; Font Geometry</span>
-                <span className="text-slate-400">Measures font kerning and structural bounding ratios against government standards.</span>
-              </div>
-            </div>
+            <ul className="space-y-2 text-xs text-slate-600 font-mono">
+              <li>• Parameters: 1,032,005 float32 weights (4.13 MB)</li>
+              <li>• Input: 224 x 224 x 3 normalized tensors</li>
+              <li>• Training Split: 1,912 train / 462 val images</li>
+              <li>• Training Epochs: 15 epochs via PyTorch</li>
+              <li>• Best Validation Accuracy: 66.45%</li>
+              <li>• Runtime Backend: TensorFlow.js LayersModel (WebGL)</li>
+            </ul>
           </div>
 
-          {/* Stage 05 & 06 */}
-          <div className="glass p-8 md:p-10 rounded-3xl relative overflow-hidden">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                STAGE 05 &amp; 06
-              </span>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                Risk Engine &amp; Reporting
-              </span>
-            </div>
-
-            <h3 className="text-2xl font-bold text-white mb-4">
-              Risk Engine &amp; Decision Synthesis
+          <div className="surface-card p-5 rounded-xl border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-900 mb-2">
+              Recognized Limitations
             </h3>
-            <p className="text-slate-300 text-sm md:text-base leading-relaxed mb-6 font-light">
-              All extracted signals are fed into a deterministic risk engine. Using a weighted scoring system, it calculates a final Trust Score. A single anomaly flags a warning; converging independent anomalies trigger a strict failure.
-            </p>
-
-            <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-950/30 to-slate-950 border border-emerald-500/30 flex items-center justify-between">
-              <div>
-                <span className="text-emerald-400 text-xs font-mono font-bold block">EXPERIENCE VERIFICATION</span>
-                <span className="text-white text-base font-bold">Try the Interactive Demo</span>
-              </div>
-
-              <button
-                onClick={() => onNavigate('verify')}
-                className="btn-primary text-xs py-2 px-5 cursor-pointer"
-              >
-                Launch Console
-              </button>
-            </div>
+            <ul className="space-y-2 text-xs text-slate-600">
+              <li>• <strong>No PKI Verification:</strong> Does not cryptographically validate digital signatures or QR payloads.</li>
+              <li>• <strong>No Registry Lookup:</strong> Does not query government databases or confirm identity existence.</li>
+              <li>• <strong>Compression Sensitivities:</strong> High overall recompression (e.g. via messaging apps) can diminish ELA accuracy.</li>
+              <li>• <strong>Evaluation Context:</strong> 66.5% validation accuracy reflects academic dataset benchmarks; real-world field performance may vary.</li>
+            </ul>
           </div>
+        </div>
+
+        {/* Action */}
+        <div className="text-center">
+          <button 
+            onClick={() => onNavigate('verify')}
+            className="btn-primary text-sm py-2 px-5"
+          >
+            Try Document Inspection
+          </button>
         </div>
       </div>
     </main>

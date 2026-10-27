@@ -34,8 +34,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#020412] text-slate-100 antialiased selection:bg-purple-600 selection:text-white">
-      {/* High-Tech Security Splash & Pre-warming Screen */}
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-slate-900 antialiased selection:bg-[#2463a6] selection:text-white">
+      {/* Initialization & Pre-warming Screen */}
       {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
 
       {/* Navigation Bar */}

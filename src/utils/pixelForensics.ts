@@ -1,5 +1,5 @@
 export interface PixelForensicResults {
-  moireScore: number; // 0 to 1 (high = screen re-photography)
+  moireScore: number; // 0 to 1 (heuristic indicator of periodic high-frequency patterns)
   isScreenRephoto: boolean;
   blurVariance: number;
   qualityPassed: boolean;
@@ -16,11 +16,13 @@ export interface PixelForensicResults {
 }
 
 /**
- * Computes deep canvas pixel-level forensics:
- * 1. Moiré screen frequency detection
- * 2. Variance of Laplacian (blur/sharpness)
- * 3. ELA compression quantization variance
- * 4. Photo boundary splicing delta
+ * Computes client-side canvas mathematical heuristics:
+ * 1. Variance of Laplacian for sharpness / blur threshold
+ * 2. Error Level Analysis (ELA) recompression delta across 16x16 macroblocks
+ * 3. Spatial frequency variance (scanline / periodic pattern heuristic)
+ * 4. Boundary luminance step-delta across candidate portrait frame coordinates
+ * 
+ * Note: These are mathematical heuristics for anomaly screening, not definitive proof of fraud.
  */
 export async function analyzeImagePixelForensics(
   img: HTMLImageElement
@@ -32,7 +34,7 @@ export async function analyzeImagePixelForensics(
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  if (!ctx) throw new Error('Canvas context unavailable');
+  if (!ctx) throw new Error('Canvas 2D context unavailable');
 
   ctx.drawImage(img, 0, 0);
   const originalData = ctx.getImageData(0, 0, width, height);
@@ -128,8 +130,7 @@ export async function analyzeImagePixelForensics(
   const varianceRatio = globalAvgDelta > 0 ? maxBlockDelta / globalAvgDelta : 1;
   const compressionInconsistency = Math.min(1, Math.max(0, (varianceRatio - 1.8) / 3.5));
 
-  // 3. Moiré / Screen Re-Photography Pattern Detection
-  // Check for high-frequency periodic horizontal/vertical scanline variance
+  // 3. High-Frequency Periodic Pattern Detection (Screen Re-Photography Heuristic)
   let periodicScanlineSpikes = 0;
   let lineComparisons = 0;
 
@@ -149,8 +150,7 @@ export async function analyzeImagePixelForensics(
   const moireScore = Math.min(0.99, Math.max(0.02, scanlineDensity * 2.8));
   const isScreenRephoto = moireScore > 0.45;
 
-  // 4. Photo Region Boundary Splicing Check
-  // Inspect the photo bounding area (typically x: 5% - 30%, y: 20% - 70%)
+  // 4. Boundary Step Luminance Delta Check
   const photoX = Math.round(width * 0.08);
   const photoY = Math.round(height * 0.22);
   const photoW = Math.round(width * 0.24);
@@ -159,7 +159,6 @@ export async function analyzeImagePixelForensics(
   let photoBorderDelta = 0;
   let borderPixelCount = 0;
 
-  // Sample top and right borders of the photo box
   for (let px = photoX; px < photoX + photoW; px += 2) {
     const idxIn = (photoY * width + px) * 4;
     const idxOut = (Math.max(0, photoY - 4) * width + px) * 4;
@@ -172,7 +171,7 @@ export async function analyzeImagePixelForensics(
   const avgBorderStep = borderPixelCount > 0 ? photoBorderDelta / borderPixelCount : 0;
   const photoRegionSpliceScore = Math.min(1, Math.max(0, (avgBorderStep - 28) / 45));
 
-  // Build flagged anomaly zones
+  // Build flagged anomaly zones with objective, non-exaggerated descriptions
   const flaggedZones: PixelForensicResults['flaggedZones'] = [];
 
   if (photoRegionSpliceScore > 0.4) {
@@ -181,7 +180,7 @@ export async function analyzeImagePixelForensics(
       y: photoY,
       width: photoW,
       height: photoH,
-      label: 'Photo Boundary Splice / Insertion Detected',
+      label: 'Edge contrast step anomaly around boundary zone',
       severity: photoRegionSpliceScore > 0.7 ? 'fail' : 'warn'
     });
   }
@@ -194,7 +193,7 @@ export async function analyzeImagePixelForensics(
       y: Math.max(0, maxBy - 20),
       width: blockSize * 3,
       height: blockSize * 3,
-      label: 'Quantization Table Mismatch (High ELA Delta)',
+      label: 'Unusual recompression delta across macroblocks (ELA)',
       severity: compressionInconsistency > 0.7 ? 'fail' : 'warn'
     });
   }
@@ -205,7 +204,7 @@ export async function analyzeImagePixelForensics(
       y: Math.round(height * 0.15),
       width: Math.round(width * 0.6),
       height: Math.round(height * 0.6),
-      label: 'Moiré Screen Re-Photography Pattern Flagged',
+      label: 'High-frequency periodic pattern (Screen re-photography indicator)',
       severity: 'fail'
     });
   }
