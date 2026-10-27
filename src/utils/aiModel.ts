@@ -76,23 +76,32 @@ class DocuGuardAIModel {
         console.log(`[DocuGuard AI] TF.js backend: ${tf.getBackend()}`);
         console.log(`[DocuGuard AI] Loading model from: ${path}`);
 
-        this.model = await tf.loadLayersModel(path);
+        try {
+          this.model = await tf.loadLayersModel(path);
+        } catch (initialErr) {
+          console.warn('[DocuGuard AI] Initial load failed on active backend, attempting CPU fallback:', initialErr);
+          await tf.setBackend('cpu');
+          await tf.ready();
+          this.model = await tf.loadLayersModel(path);
+        }
+
         this._isReady = true;
         console.log('[DocuGuard AI] Model loaded successfully');
         
         // Warm up with a dummy inference
-        const dummy = tf.zeros([1, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, 3]);
-        const warmup = this.model.predict(dummy);
-        if (Array.isArray(warmup)) {
-          warmup.forEach(t => t.dispose());
-        } else {
-          (warmup as tf.Tensor).dispose();
-        }
-        dummy.dispose();
+        tf.tidy(() => {
+          const dummy = tf.zeros([1, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, 3]);
+          const warmup = this.model?.predict(dummy);
+          if (Array.isArray(warmup)) {
+            warmup.forEach(t => t.dispose());
+          } else if (warmup) {
+            (warmup as tf.Tensor).dispose();
+          }
+        });
         console.log('[DocuGuard AI] Warmup inference complete');
 
       } catch (err) {
-        console.warn('[DocuGuard AI] Model not available — will use heuristic fallback:', err);
+        console.warn('[DocuGuard AI] Model could not be initialized — using pixel and metadata heuristics:', err);
         this._isReady = false;
         this.model = null;
       } finally {
@@ -108,6 +117,13 @@ class DocuGuardAIModel {
    * Preprocess an HTMLImageElement or HTMLCanvasElement into a normalized tensor
    */
   preprocessImage(source: HTMLImageElement | HTMLCanvasElement): tf.Tensor4D {
+    const width = 'naturalWidth' in source ? (source.naturalWidth || source.width) : source.width;
+    const height = 'naturalHeight' in source ? (source.naturalHeight || source.height) : source.height;
+
+    if (!width || !height) {
+      throw new Error('Image source is not ready or has zero dimensions.');
+    }
+
     return tf.tidy(() => {
       // Convert to tensor
       let tensor = tf.browser.fromPixels(source);
@@ -132,13 +148,21 @@ class DocuGuardAIModel {
    */
   async predict(source: HTMLImageElement | HTMLCanvasElement): Promise<AIModelPrediction | null> {
     if (!this._isReady || !this.model) {
-      return null;
+      // Attempt on-demand load if not yet initialized
+      const ready = await this.load();
+      if (!ready || !this.model) {
+        return null;
+      }
     }
 
     const startTime = performance.now();
+    let inputTensor: tf.Tensor4D | null = null;
+    let classTensor: tf.Tensor | null = null;
+    let scoreTensor: tf.Tensor | null = null;
+    let heatmapTensor: tf.Tensor | null = null;
 
     try {
-      const inputTensor = this.preprocessImage(source);
+      inputTensor = this.preprocessImage(source);
 
       // Model outputs: [classificationTensor, scoreTensor, heatmapTensor]
       const outputs = this.model.predict(inputTensor);
@@ -149,47 +173,50 @@ class DocuGuardAIModel {
 
       if (Array.isArray(outputs)) {
         // Multi-output model: [classification, score, heatmap]
-        const [classTensor, scoreTensor, heatmapTensor] = outputs;
+        [classTensor, scoreTensor, heatmapTensor] = outputs;
 
         classProbs = new Float32Array(await classTensor.data());
         const scoreData = await scoreTensor.data();
         forgeryScoreRaw = scoreData[0];
         heatmapData = new Float32Array(await heatmapTensor.data());
-
-        classTensor.dispose();
-        scoreTensor.dispose();
-        heatmapTensor.dispose();
       } else {
         // Single-output model (classification only) — derive score from probs
-        classProbs = new Float32Array(await (outputs as tf.Tensor).data());
-        // If model only outputs 3 values, derive score
+        classTensor = outputs as tf.Tensor;
+        classProbs = new Float32Array(await classTensor.data());
         forgeryScoreRaw = classProbs[0] * 5 + classProbs[1] * 50 + classProbs[2] * 95;
         heatmapData = new Float32Array(49).fill(0);
-        (outputs as tf.Tensor).dispose();
       }
-
-      inputTensor.dispose();
 
       const inferenceTimeMs = performance.now() - startTime;
 
       // Determine verdict from probabilities
       const maxIdx = classProbs.indexOf(Math.max(...classProbs));
-      const verdict = CLASS_LABELS[maxIdx];
+      const verdict = CLASS_LABELS[maxIdx] || 'Real';
 
       // Clamp forgery score
       const forgeryScore = Math.round(Math.max(0, Math.min(100, forgeryScoreRaw)));
 
       return {
         verdict,
-        probabilities: [classProbs[0], classProbs[1], classProbs[2]],
+        probabilities: [classProbs[0] || 0, classProbs[1] || 0, classProbs[2] || 0],
         forgeryScore,
         anomalyHeatmap: Array.from(heatmapData),
         modelLoaded: true,
         inferenceTimeMs: Math.round(inferenceTimeMs)
       };
     } catch (err) {
-      console.error('[DocuGuard AI] Inference failed:', err);
+      console.error('[DocuGuard AI] Inference encountered an error:', err);
       return null;
+    } finally {
+      // Guaranteed tensor disposal to prevent GPU memory leaks
+      try {
+        inputTensor?.dispose();
+        classTensor?.dispose();
+        scoreTensor?.dispose();
+        heatmapTensor?.dispose();
+      } catch {
+        // ignore disposal errors
+      }
     }
   }
 
