@@ -1,0 +1,10 @@
+{
+  "model_name": "DocuGuard_Forensic_CNN",
+  "version": "0.0.0-untrained",
+  "status": "PLACEHOLDER — Train the model with train_model.py to generate real weights",
+  "input_size": 224,
+  "classes": ["real", "suspicious", "tampered"],
+  "num_classes": 3,
+  "output_heads": ["classification_output", "score_output", "heatmap_output"],
+  "instructions": "Run: python train_model.py --data ./dataset --epochs 50 --batch 32"
+}
