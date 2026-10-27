@@ -7,3 +7,18 @@ coverage/
 .vercel
 .env*
 !.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.h5
+*.keras
+models/
+
+# Dataset images (keep directory structure via .gitkeep)
+dataset/**/*.jpg
+dataset/**/*.jpeg
+dataset/**/*.png
+dataset/**/*.webp
+dataset/**/*.bmp
