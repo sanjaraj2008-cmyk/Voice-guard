@@ -9,21 +9,23 @@ import {
   getVerdictConfig
 } from '../utils/edgePipeline';
 import { generateAndDownloadDossierPdf } from '../utils/pdfDossier';
+import { convertPdfPageToImage } from '../utils/pdfRenderer';
 
 export const VerifyPage: React.FC = () => {
   const [data, setData] = useState<DocumentVerificationData | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [currentStepName, setCurrentStepName] = useState<string>('Loading your image');
+  const [currentStepName, setCurrentStepName] = useState<string>('Loading your file');
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(1);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [expandedEvidenceIdx, setExpandedEvidenceIdx] = useState<number | null>(null);
+  const [pdfInfo, setPdfInfo] = useState<{ pageCount: number } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const progressSteps = [
-    { index: 1, label: 'Loading your image' },
+    { index: 1, label: 'Loading your document' },
     { index: 2, label: 'Checking image quality' },
     { index: 3, label: 'Examining possible inconsistencies' },
     { index: 4, label: 'Preparing the results' }
@@ -32,32 +34,46 @@ export const VerifyPage: React.FC = () => {
   const validateAndProcessFile = async (file: File) => {
     setErrorMessage(null);
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      setErrorMessage(`This file format (${file.type || 'unknown'}) is not supported. Please choose a JPG, PNG, or WebP image.`);
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const isImage = validImageTypes.includes(file.type);
+
+    if (!isPdf && !isImage) {
+      setErrorMessage(`This file format (${file.type || 'unknown'}) is not supported. Please choose a JPG, PNG, WebP image, or PDF document.`);
       return;
     }
 
-    const maxSize = 10 * 1024 * 1024; // 10 MB
+    const maxSize = 20 * 1024 * 1024; // 20 MB
     if (file.size > maxSize) {
-      setErrorMessage(`The selected file is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). The maximum allowed file size is 10 MB.`);
+      setErrorMessage(`The selected file is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). The maximum allowed file size is 20 MB.`);
       return;
     }
 
     setIsDemoMode(false);
     setIsProcessing(true);
     setCurrentStepIndex(1);
-    setCurrentStepName('Loading your image');
 
     try {
-      const result = await runEdgeVerificationPipeline(file, file.name, (idx, stageName) => {
+      let targetBlob: Blob = file;
+
+      if (isPdf) {
+        setCurrentStepName('Rendering PDF page 1');
+        const pdfResult = await convertPdfPageToImage(file);
+        targetBlob = pdfResult.imageBlob;
+        setPdfInfo({ pageCount: pdfResult.pageCount });
+      } else {
+        setPdfInfo(null);
+        setCurrentStepName('Loading your image');
+      }
+
+      const result = await runEdgeVerificationPipeline(targetBlob, file.name, (idx, stageName) => {
         setCurrentStepIndex(idx);
         setCurrentStepName(stageName);
       });
       setData(result);
     } catch (err: any) {
       console.error('Inspection error:', err);
-      setErrorMessage(err.message || 'We could not analyze this image. Please try another file.');
+      setErrorMessage(err.message || 'We could not analyze this document. Please try another file.');
     } finally {
       setIsProcessing(false);
     }
@@ -73,6 +89,7 @@ export const VerifyPage: React.FC = () => {
 
   const handleLoadPreset = (presetId: string) => {
     setErrorMessage(null);
+    setPdfInfo(null);
     const preset = SAMPLE_PRESETS.find(p => p.id === presetId);
     if (!preset) return;
 
@@ -145,6 +162,7 @@ export const VerifyPage: React.FC = () => {
                   setData(null);
                   setIsDemoMode(false);
                   setErrorMessage(null);
+                  setPdfInfo(null);
                 }}
                 className="vg-btn-secondary text-sm self-start sm:self-auto"
               >
@@ -219,32 +237,32 @@ export const VerifyPage: React.FC = () => {
               </div>
 
               <h2 className="text-lg font-bold text-[#172033] mb-1">
-                Choose a document image
+                Choose a document image or PDF
               </h2>
               <p className="text-sm text-[#586579] mb-4">
-                Upload a clear JPG, PNG, or supported image file. Drag and drop here or click below.
+                Upload a clear JPG, PNG, WebP image, or PDF document. Drag and drop here or click below.
               </p>
 
               <button
                 type="button"
                 className="vg-btn-primary text-sm py-2 px-5 mb-5 pointer-events-none"
               >
-                Choose image
+                Choose file
               </button>
 
               <div className="max-w-md mx-auto pt-4 border-t border-[#E2E7EF] text-xs text-[#586579] space-y-1">
                 <p>
-                  <strong>Supported formats:</strong> JPG, PNG, WebP · <strong>Maximum size:</strong> 10 MB
+                  <strong>Supported formats:</strong> JPG, PNG, WebP, PDF (Page 1) · <strong>Maximum size:</strong> 20 MB
                 </p>
                 <p className="text-[#828FA3]">
-                  <strong>Privacy guarantee:</strong> Your image stays on your computer. It is examined locally in your web browser and is not uploaded to any server.
+                  <strong>Privacy guarantee:</strong> Your document stays on your device. It is examined locally in your web browser and is not uploaded to any server.
                 </p>
               </div>
 
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
                 className="hidden"
                 onChange={handleFileChange}
               />
@@ -365,10 +383,17 @@ export const VerifyPage: React.FC = () => {
             <div className="vg-card p-5 border border-[#E2E7EF] bg-white">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E7EF] mb-4">
                 <div>
-                  <span className="text-xs text-[#586579] block">Examined image:</span>
-                  <span className="text-sm font-bold text-[#172033] truncate block max-w-md">
-                    {data.fileName}
-                  </span>
+                  <span className="text-xs text-[#586579] block">Examined document:</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-[#172033] truncate block max-w-md">
+                      {data.fileName}
+                    </span>
+                    {pdfInfo && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#EEF2F6] text-[#315EFB] border border-[#CBD5E1]">
+                        PDF Document (Page 1 of {pdfInfo.pageCount})
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -376,10 +401,11 @@ export const VerifyPage: React.FC = () => {
                       setData(null);
                       setIsDemoMode(false);
                       setErrorMessage(null);
+                      setPdfInfo(null);
                     }}
                     className="vg-btn-secondary text-xs py-1.5 px-3"
                   >
-                    Remove or replace image
+                    Remove or replace file
                   </button>
 
                   <button

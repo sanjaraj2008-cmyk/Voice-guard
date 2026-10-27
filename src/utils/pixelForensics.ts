@@ -73,9 +73,10 @@ export async function analyzeImagePixelForensics(
 
   const lapMean = laplacianSum / Math.max(1, edgeSampleCount);
   const blurVariance = (laplacianSumSq / Math.max(1, edgeSampleCount)) - (lapMean * lapMean);
-  const qualityPassed = blurVariance > 80;
+  // Calibrated threshold: adequate edge definition for typical scanned/photographed documents
+  const qualityPassed = blurVariance > 35;
 
-  // 2. Real Error Level Analysis (ELA) Recompression Variance
+  // 2. Error Level Analysis (ELA) Recompression Variance
   const recompressedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
   const recompressedImg = await new Promise<HTMLImageElement>((resolve, reject) => {
     const rImg = new Image();
@@ -97,8 +98,7 @@ export async function analyzeImagePixelForensics(
   const blockSize = 16;
   const cols = Math.floor(width / blockSize);
   const rows = Math.floor(height / blockSize);
-  const blockDeltas = new Float32Array(cols * rows);
-  let totalDelta = 0;
+  const activeBlockDeltas: number[] = [];
   let maxBlockDelta = 0;
   let maxBlockIdx = 0;
 
@@ -116,8 +116,11 @@ export async function analyzeImagePixelForensics(
       }
       const avgBDelta = bDelta / (blockSize * blockSize);
       const bIdx = by * cols + bx;
-      blockDeltas[bIdx] = avgBDelta;
-      totalDelta += avgBDelta;
+
+      // Only evaluate active content blocks (ignore blank white/black margins)
+      if (avgBDelta > 2.0) {
+        activeBlockDeltas.push(avgBDelta);
+      }
 
       if (avgBDelta > maxBlockDelta) {
         maxBlockDelta = avgBDelta;
@@ -126,29 +129,56 @@ export async function analyzeImagePixelForensics(
     }
   }
 
-  const globalAvgDelta = totalDelta / Math.max(1, cols * rows);
-  const varianceRatio = globalAvgDelta > 0 ? maxBlockDelta / globalAvgDelta : 1;
-  const compressionInconsistency = Math.min(1, Math.max(0, (varianceRatio - 1.8) / 3.5));
-
-  // 3. High-Frequency Periodic Pattern Detection (Screen Re-Photography Heuristic)
-  let periodicScanlineSpikes = 0;
-  let lineComparisons = 0;
-
-  for (let y = 10; y < height - 10; y += 4) {
-    let rowEnergyPrev = 0;
-    for (let x = 10; x < width - 10; x += 4) {
-      const idx = (y * width + x) * 4;
-      const lum = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
-      const energyDelta = Math.abs(lum - rowEnergyPrev);
-      if (energyDelta > 42) periodicScanlineSpikes++;
-      rowEnergyPrev = lum;
-      lineComparisons++;
-    }
+  // Calculate coefficient of variation among active content blocks
+  let compressionInconsistency = 0.12; // Baseline nominal variance
+  if (activeBlockDeltas.length > 20) {
+    const activeMean = activeBlockDeltas.reduce((a, b) => a + b, 0) / activeBlockDeltas.length;
+    const activeVariance = activeBlockDeltas.reduce((acc, val) => acc + Math.pow(val - activeMean, 2), 0) / activeBlockDeltas.length;
+    const activeStdDev = Math.sqrt(activeVariance);
+    const coeffOfVar = activeMean > 0 ? activeStdDev / activeMean : 0;
+    
+    // Normal documents with uniform compression have coeffOfVar between 0.20 and 0.55
+    // Spliced or digitally inserted regions produce distinct outliers (coeffOfVar > 0.85)
+    compressionInconsistency = Math.min(1.0, Math.max(0.05, (coeffOfVar - 0.40) / 0.80));
   }
 
-  const scanlineDensity = lineComparisons > 0 ? periodicScanlineSpikes / lineComparisons : 0;
-  const moireScore = Math.min(0.99, Math.max(0.02, scanlineDensity * 2.8));
-  const isScreenRephoto = moireScore > 0.45;
+  // 3. High-Frequency Periodic Pattern Detection (True Screen Re-Photography / Moiré)
+  // Genuine Moiré ripples produce rapid alternating sign gradients (+ - + -) of subtle amplitude (3 to 35)
+  // Normal document text has isolated stark contrast steps (amplitude > 80) without alternating periodicity
+  let periodicSampleRows = 0;
+  let testRows = 0;
+
+  for (let y = 16; y < height - 16; y += Math.max(4, Math.floor(height / 60))) {
+    let altSignCount = 0;
+    let prevDiff = 0;
+    let rowSamples = 0;
+
+    for (let x = 16; x < width - 16; x += 3) {
+      const idx = (y * width + x) * 4;
+      const prevIdx = (y * width + (x - 3)) * 4;
+      const l1 = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+      const l0 = data[prevIdx] * 0.299 + data[prevIdx + 1] * 0.587 + data[prevIdx + 2] * 0.114;
+      const diff = l1 - l0;
+
+      // Subpixel electronic display grids oscillate with subtle amplitude
+      if (Math.abs(diff) >= 3.5 && Math.abs(diff) <= 38) {
+        if (prevDiff !== 0 && ((diff > 0 && prevDiff < 0) || (diff < 0 && prevDiff > 0))) {
+          altSignCount++;
+        }
+      }
+      prevDiff = diff;
+      rowSamples++;
+    }
+
+    if (rowSamples > 20 && (altSignCount / rowSamples) > 0.35) {
+      periodicSampleRows++;
+    }
+    testRows++;
+  }
+
+  const moireDensity = testRows > 0 ? periodicSampleRows / testRows : 0;
+  const moireScore = Math.min(0.99, Math.max(0.02, moireDensity * 1.5));
+  const isScreenRephoto = moireScore > 0.55;
 
   // 4. Boundary Step Luminance Delta Check
   const photoX = Math.round(width * 0.08);
@@ -169,23 +199,23 @@ export async function analyzeImagePixelForensics(
   }
 
   const avgBorderStep = borderPixelCount > 0 ? photoBorderDelta / borderPixelCount : 0;
-  const photoRegionSpliceScore = Math.min(1, Math.max(0, (avgBorderStep - 28) / 45));
+  const photoRegionSpliceScore = Math.min(1, Math.max(0, (avgBorderStep - 38) / 50));
 
   // Build flagged anomaly zones with objective, non-exaggerated descriptions
   const flaggedZones: PixelForensicResults['flaggedZones'] = [];
 
-  if (photoRegionSpliceScore > 0.4) {
+  if (photoRegionSpliceScore > 0.55) {
     flaggedZones.push({
       x: photoX,
       y: photoY,
       width: photoW,
       height: photoH,
       label: 'Edge contrast step anomaly around boundary zone',
-      severity: photoRegionSpliceScore > 0.7 ? 'fail' : 'warn'
+      severity: photoRegionSpliceScore > 0.8 ? 'fail' : 'warn'
     });
   }
 
-  if (compressionInconsistency > 0.4) {
+  if (compressionInconsistency > 0.60) {
     const maxBx = (maxBlockIdx % cols) * blockSize;
     const maxBy = Math.floor(maxBlockIdx / cols) * blockSize;
     flaggedZones.push({
@@ -194,7 +224,7 @@ export async function analyzeImagePixelForensics(
       width: blockSize * 3,
       height: blockSize * 3,
       label: 'Unusual recompression delta across macroblocks (ELA)',
-      severity: compressionInconsistency > 0.7 ? 'fail' : 'warn'
+      severity: compressionInconsistency > 0.8 ? 'fail' : 'warn'
     });
   }
 

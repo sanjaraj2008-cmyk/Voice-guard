@@ -395,14 +395,14 @@ export async function runEdgeVerificationPipeline(
 
   // 1. Image Quality / Laplacian Sharpness Check
   const qualityPassed = pixelForensics.qualityPassed;
-  const blurScore = Math.min(1, pixelForensics.blurVariance / 300);
+  const blurScore = Math.min(1, pixelForensics.blurVariance / 200);
 
   if (!qualityPassed) {
-    scorePenalties += 15;
+    scorePenalties += 10;
     evidence.push({
       category: 'texture',
-      weight: 15,
-      observation: `Image sharpness measurement (${pixelForensics.blurVariance.toFixed(1)}) is below the recommended threshold (80.0)`,
+      weight: 10,
+      observation: `Image sharpness measurement (${pixelForensics.blurVariance.toFixed(1)}) is below standard threshold (35.0)`,
       explanation: 'The image has low edge contrast or noticeable blur. Reduced sharpness can make fine tampering indicators harder to evaluate.',
       howChecked: 'Laplacian edge variance calculation across the full image bitmap',
       whyItMatters: 'Adequate sharpness is required to differentiate legitimate focus falloff from synthetic blur or smoothing.',
@@ -413,7 +413,7 @@ export async function runEdgeVerificationPipeline(
   } else {
     evidence.push({
       category: 'texture',
-      weight: 15,
+      weight: 10,
       observation: `Image sharpness is sufficient for analysis (Laplacian variance: ${pixelForensics.blurVariance.toFixed(1)})`,
       explanation: 'Edge transitions are sharp and clear, allowing reliable compression and texture evaluation.',
       howChecked: 'Laplacian edge variance filter across edge gradients',
@@ -426,12 +426,12 @@ export async function runEdgeVerificationPipeline(
 
   // 2. Error Level Analysis (ELA) Compression Discrepancies
   const compressionDelta = pixelForensics.compressionInconsistency;
-  if (compressionDelta > 0.45) {
-    scorePenalties += 35;
+  if (compressionDelta > 0.50) {
+    scorePenalties += 25;
     evidence.push({
       category: 'compression',
       weight: 25,
-      observation: `Unusual compression differences found across macroblock sections (${(compressionDelta * 100).toFixed(0)}% delta)`,
+      observation: `Elevated compression differences found across macroblock sections (${(compressionDelta * 100).toFixed(0)}% delta)`,
       explanation: 'Certain regions of the image exhibit higher compression differences than the rest of the document.',
       howChecked: '16x16 macroblock JPEG Error Level Analysis compared against a 75% baseline resave',
       whyItMatters: 'When text or photos are digitally inserted, they frequently carry a different compression history than the background.',
@@ -455,11 +455,11 @@ export async function runEdgeVerificationPipeline(
 
   // 3. Screen Re-photography Pattern Check
   if (pixelForensics.isScreenRephoto) {
-    scorePenalties += 40;
+    scorePenalties += 35;
     evidence.push({
       category: 'texture',
       weight: 30,
-      observation: `High-frequency periodic pattern detected (${(pixelForensics.moireScore * 100).toFixed(0)}% signal strength)`,
+      observation: `High-frequency periodic screen pattern detected (${(pixelForensics.moireScore * 100).toFixed(0)}% signal strength)`,
       explanation: 'A repetitive frequency pattern typical of photographing an electronic screen (LCD/OLED) was found.',
       howChecked: 'Sub-pixel spatial frequency analysis for periodic scanline interference',
       whyItMatters: 'Legitimate identity verification generally requires photos of physical cards rather than pictures of screens.',
@@ -512,7 +512,15 @@ export async function runEdgeVerificationPipeline(
   // 5. In-Browser Neural Network Tamper Assessment
   if (aiModelPrediction) {
     const [pReal, pSuspicious, pTampered] = aiModelPrediction.probabilities;
-    scorePenalties += Math.round(aiModelPrediction.forgeryScore * 0.45);
+    
+    // Proportional penalty based on model risk assessment:
+    // If verdict is Real, zero penalty.
+    // If verdict is Suspicious or Tampered, penalize proportionally.
+    if (aiModelPrediction.verdict === 'Tampered') {
+      scorePenalties += Math.round(Math.min(35, pTampered * 40));
+    } else if (aiModelPrediction.verdict === 'Suspicious') {
+      scorePenalties += Math.round(Math.min(20, pSuspicious * 25));
+    }
 
     evidence.push({
       category: 'layout',
@@ -552,8 +560,9 @@ export async function runEdgeVerificationPipeline(
     confidence: 1.0
   });
 
-  const finalScore = Math.max(10, Math.min(96, 100 - scorePenalties));
-  const verdict: VerdictType = finalScore >= 80 ? 'Real' : finalScore >= 50 ? 'Suspicious' : 'Tampered';
+  const baseScore = 95;
+  const finalScore = Math.max(12, Math.min(95, baseScore - scorePenalties));
+  const verdict: VerdictType = finalScore >= 75 ? 'Real' : finalScore >= 45 ? 'Suspicious' : 'Tampered';
 
   return {
     documentId: `DG-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`,
