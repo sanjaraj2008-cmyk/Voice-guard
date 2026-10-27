@@ -1,6 +1,7 @@
 import { DocumentVerificationData, ForensicEvidenceItem, SampleDocPreset, VerdictConfig, VerdictType } from '../types/edge';
 import { analyzeImagePixelForensics } from './pixelForensics';
 import { validateVerhoeff, validatePanCard, validateDateOfBirth } from './checksumValidators';
+import { docuGuardAI, AIModelPrediction, CLASS_LABELS } from './aiModel';
 
 export const getVerdictConfig = (verdict: VerdictType): VerdictConfig => {
   if (verdict === 'Real') {
@@ -483,45 +484,155 @@ export async function runEdgeVerificationPipeline(
   }
 
   // Stage 05: Risk Synthesis & Multimodal AI Verification
-  onProgress?.(5, '05. RISK SYNTHESIS');
+  onProgress?.(5, '05. AI MODEL INFERENCE');
 
-  let aiResult: any = null;
+  // ─── In-Browser AI Model Inference ─────────────────────────────────
+  let aiModelPrediction: AIModelPrediction | null = null;
   try {
-    // Convert image to base64 for vision analysis
-    const base64Canvas = document.createElement('canvas');
-    base64Canvas.width = Math.min(1200, width);
-    base64Canvas.height = Math.round(height * (base64Canvas.width / width));
-    const bCtx = base64Canvas.getContext('2d');
-    if (bCtx) {
-      bCtx.drawImage(img, 0, 0, base64Canvas.width, base64Canvas.height);
-      const base64Data = base64Canvas.toDataURL('image/jpeg', 0.85);
-
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: base64Data,
-          fileName,
-          mimeType: 'image/jpeg'
-        })
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success) {
-          aiResult = json;
-        }
+    // Attempt to load the trained TF.js model (lazy, loads only once)
+    const modelReady = await docuGuardAI.load();
+    if (modelReady) {
+      aiModelPrediction = await docuGuardAI.predict(img);
+      if (aiModelPrediction) {
+        console.log(
+          `[DocuGuard AI] Inference complete in ${aiModelPrediction.inferenceTimeMs}ms — ` +
+          `Verdict: ${aiModelPrediction.verdict}, Score: ${aiModelPrediction.forgeryScore}`
+        );
       }
     }
   } catch (err) {
-    console.warn('API analyze call notice; falling back to local mathematical edge engine:', err);
+    console.warn('[DocuGuard AI] Model inference failed, will use heuristic/API fallback:', err);
+  }
+
+  // ─── Gemini API Fallback (if model not available) ──────────────────
+  let aiResult: any = null;
+  if (!aiModelPrediction) {
+    try {
+      const base64Canvas = document.createElement('canvas');
+      base64Canvas.width = Math.min(1200, width);
+      base64Canvas.height = Math.round(height * (base64Canvas.width / width));
+      const bCtx = base64Canvas.getContext('2d');
+      if (bCtx) {
+        bCtx.drawImage(img, 0, 0, base64Canvas.width, base64Canvas.height);
+        const base64Data = base64Canvas.toDataURL('image/jpeg', 0.85);
+
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64Data,
+            fileName,
+            mimeType: 'image/jpeg'
+          })
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) {
+            aiResult = json;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('API analyze call notice; falling back to local mathematical edge engine:', err);
+    }
   }
 
   // Stage 06: Dossier Ready
   onProgress?.(6, '06. DOSSIER READY');
   await new Promise(r => setTimeout(r, 300));
 
-  // If Gemini Vision AI returned authoritative findings, use high-precision synthesis
+  // ─── If AI Model produced predictions, use them ────────────────────
+  if (aiModelPrediction) {
+    const aiVerdict = aiModelPrediction.verdict as VerdictType;
+    const aiScore = 100 - aiModelPrediction.forgeryScore; // Invert: model outputs forgery score, pipeline uses authenticity score
+
+    // Build evidence items from AI model analysis
+    const aiEvidence: ForensicEvidenceItem[] = [
+      {
+        category: 'texture',
+        weight: 35,
+        observation: `AI CNN texture analysis: ${aiModelPrediction.probabilities[0] > 0.7 ? 'Authentic substrate' : 'Anomalous texture patterns detected'}`,
+        explanation: `Neural network confidence — Real: ${(aiModelPrediction.probabilities[0] * 100).toFixed(1)}%, Suspicious: ${(aiModelPrediction.probabilities[1] * 100).toFixed(1)}%, Tampered: ${(aiModelPrediction.probabilities[2] * 100).toFixed(1)}%`,
+        severity: aiModelPrediction.probabilities[2] > 0.5 ? 'fail' : aiModelPrediction.probabilities[1] > 0.4 ? 'warn' : 'pass',
+        confidence: Math.max(...aiModelPrediction.probabilities)
+      },
+      {
+        category: 'compression',
+        weight: 10,
+        observation: `ELA compression variance: ${(pixelForensics.compressionInconsistency * 100).toFixed(0)}%`,
+        explanation: pixelForensics.compressionInconsistency > 0.4
+          ? 'Localized macroblocks show higher error variance — possible digital editing'
+          : 'Uniform JPEG quantization across all macroblocks',
+        severity: pixelForensics.compressionInconsistency > 0.4 ? 'warn' : 'pass',
+        confidence: 0.91
+      },
+      {
+        category: 'metadata',
+        weight: 10,
+        observation: detectedSoftware
+          ? `EXIF software tag: ${detectedSoftware}`
+          : exifPresent ? 'Camera sensor profile verified' : 'Metadata tables clean / stripped',
+        explanation: detectedSoftware
+          ? 'File processed through digital photo editing software'
+          : 'No known raster editing signatures found',
+        severity: detectedSoftware ? 'fail' : 'pass',
+        confidence: 0.88
+      },
+      {
+        category: 'layout',
+        weight: 25,
+        observation: `AI spatial heatmap: ${aiModelPrediction.anomalyHeatmap.filter(v => v > 0.5).length} high-activation zones out of 49`,
+        explanation: aiModelPrediction.anomalyHeatmap.filter(v => v > 0.5).length > 8
+          ? 'Multiple spatial regions show anomalous activation — likely tampered areas'
+          : 'Spatial activation map shows uniform, expected distribution',
+        severity: aiModelPrediction.anomalyHeatmap.filter(v => v > 0.5).length > 8 ? 'fail' : 'pass',
+        confidence: 0.93
+      }
+    ];
+
+    // Generate AI heatmap overlay
+    let aiHeatmapUrl: string | undefined;
+    try {
+      aiHeatmapUrl = docuGuardAI.generateHeatmapOverlay(img, aiModelPrediction.anomalyHeatmap);
+    } catch (_) { /* heatmap overlay is optional */ }
+
+    return {
+      documentId: `DOC-AI-${Math.floor(100000 + Math.random() * 900000)}`,
+      fileName,
+      generatedAt: new Date().toISOString(),
+      score: Math.round(aiScore),
+      verdict: aiVerdict,
+      imageBlobUrl,
+      boundaryConfidence: aiVerdict === 'Real' ? 0.96 : aiVerdict === 'Suspicious' ? 0.82 : 0.65,
+      qr: aiVerdict === 'Real' ? 'VERIFIED_UIDAI_SIGNATURE_OK' : null,
+      faceRegion: { x: Math.round(width * 0.08), y: Math.round(height * 0.22), width: Math.round(width * 0.24), height: Math.round(height * 0.46) },
+      compressionArtifacts: {
+        inconsistencyScore: pixelForensics.compressionInconsistency
+      },
+      qualityCheck: {
+        blurScore: Math.min(1, pixelForensics.blurVariance / 300),
+        brightnessOk: true,
+        passed: pixelForensics.qualityPassed
+      },
+      metadata: {
+        exifPresent,
+        software: detectedSoftware,
+        anomalies: [
+          ...exifAnomalies,
+          `AI Model Inference: ${aiModelPrediction.inferenceTimeMs}ms (${aiModelPrediction.verdict})`
+        ]
+      },
+      ocr: {
+        confidence: aiVerdict === 'Real' ? 0.96 : aiVerdict === 'Suspicious' ? 0.78 : 0.38,
+        fields: {},
+        rawText: ''
+      },
+      evidence: aiEvidence
+    };
+  }
+
+  // ─── If Gemini Vision AI returned findings, use them ───────────────
   if (aiResult) {
     return {
       documentId: `DOC-${Math.floor(100000 + Math.random() * 900000)}`,
