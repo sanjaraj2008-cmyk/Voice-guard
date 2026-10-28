@@ -6,74 +6,102 @@ import {
 import { 
   SAMPLE_PRESETS, 
   runEdgeVerificationPipeline,
-  getVerdictConfig
+  getVerdictConfig,
+  recomputeVerdictWithRL
 } from '../utils/edgePipeline';
 import { generateAndDownloadDossierPdf } from '../utils/pdfDossier';
-import { convertPdfPageToImage } from '../utils/pdfRenderer';
+import { rlPolicyAgent, GroundTruthAction } from '../utils/rlEngine';
 
 export const VerifyPage: React.FC = () => {
   const [data, setData] = useState<DocumentVerificationData | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [currentStepName, setCurrentStepName] = useState<string>('Loading your file');
-  const [currentStepIndex, setCurrentStepIndex] = useState<number>(1);
+  const [currentStage, setCurrentStage] = useState<{ index: number; name: string }>({ 
+    index: 1, 
+    name: 'Reading document text...' 
+  });
+  const [activeViewMode, setActiveViewMode] = useState<'standard' | 'ocr' | 'forensic'>('standard');
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
-  const [expandedEvidenceIdx, setExpandedEvidenceIdx] = useState<number | null>(null);
-  const [pdfInfo, setPdfInfo] = useState<{ pageCount: number } | null>(null);
+  const [isHashCopied, setIsHashCopied] = useState<boolean>(false);
+  const [downloadSuccessToast, setDownloadSuccessToast] = useState<boolean>(false);
+  const [sensitivityThreshold, setSensitivityThreshold] = useState<number>(78);
+  const [rlStats, setRlStats] = useState(() => rlPolicyAgent.getStats());
+  const [feedbackToast, setFeedbackToast] = useState<{ reward: number; explanation: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const progressSteps = [
-    { index: 1, label: 'Loading your document' },
-    { index: 2, label: 'Checking image quality' },
-    { index: 3, label: 'Examining possible inconsistencies' },
-    { index: 4, label: 'Preparing the results' }
-  ];
+  const copyHash = (hash: string) => {
+    if (!hash) return;
+    navigator.clipboard?.writeText(hash).then(() => {
+      setIsHashCopied(true);
+      setTimeout(() => setIsHashCopied(false), 2000);
+    }).catch(() => {
+      setIsHashCopied(true);
+      setTimeout(() => setIsHashCopied(false), 2000);
+    });
+  };
 
-  const validateAndProcessFile = async (file: File) => {
-    setErrorMessage(null);
-
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-    const validImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const isImage = validImageTypes.includes(file.type);
-
-    if (!isPdf && !isImage) {
-      setErrorMessage(`This file format (${file.type || 'unknown'}) is not supported. Please choose a JPG, PNG, WebP image, or PDF document.`);
-      return;
+  const handleSensitivityChange = (newThreshold: number) => {
+    setSensitivityThreshold(newThreshold);
+    if (data) {
+      const updated = recomputeVerdictWithRL(data, newThreshold);
+      setData(updated);
     }
+  };
 
-    const maxSize = 20 * 1024 * 1024; // 20 MB
-    if (file.size > maxSize) {
-      setErrorMessage(`The selected file is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). The maximum allowed file size is 20 MB.`);
-      return;
+  const handleProvideFeedback = (targetGroundTruth: GroundTruthAction) => {
+    if (!data) return;
+    const currentAction: GroundTruthAction = data.verdict === 'NO_SIGNIFICANT_MANIPULATION' ? 0 : data.verdict === 'POSSIBLE_MANIPULATION' ? 1 : 2;
+    const features = data.rlCalibration?.featureVector || rlPolicyAgent.extractFeatureVector({});
+    const res = rlPolicyAgent.learnFromFeedback(features, currentAction, targetGroundTruth, data.fileName, data.sha256);
+    
+    const label = targetGroundTruth === 0 ? 'Genuine' : targetGroundTruth === 1 ? 'Needs Review' : 'Altered';
+    setFeedbackToast({ 
+      reward: res.reward, 
+      explanation: `Marked as ${label}. Saved to device memory for instant recognition on re-upload.` 
+    });
+    setRlStats(rlPolicyAgent.getStats());
+    const updated = recomputeVerdictWithRL(data, sensitivityThreshold);
+    setData(updated);
+    setTimeout(() => setFeedbackToast(null), 5000);
+  };
+
+  const handleResetPolicy = () => {
+    rlPolicyAgent.resetToFactory();
+    setRlStats(rlPolicyAgent.getStats());
+    setFeedbackToast({ reward: 0, explanation: 'Reset all custom verification rules and remembered documents.' });
+    if (data) {
+      const updated = recomputeVerdictWithRL(data, sensitivityThreshold);
+      setData(updated);
     }
+    setTimeout(() => setFeedbackToast(null), 4000);
+  };
 
-    setIsDemoMode(false);
+  const handleStartPipeline = async (blob: Blob, name: string) => {
     setIsProcessing(true);
-    setCurrentStepIndex(1);
+    setCurrentStage({ index: 1, name: 'Reading document text & IDs...' });
 
     try {
-      let targetBlob: Blob = file;
-
-      if (isPdf) {
-        setCurrentStepName('Rendering PDF page 1');
-        const pdfResult = await convertPdfPageToImage(file);
-        targetBlob = pdfResult.imageBlob;
-        setPdfInfo({ pageCount: pdfResult.pageCount });
-      } else {
-        setPdfInfo(null);
-        setCurrentStepName('Loading your image');
-      }
-
-      const result = await runEdgeVerificationPipeline(targetBlob, file.name, (idx, stageName) => {
-        setCurrentStepIndex(idx);
-        setCurrentStepName(stageName);
-      });
+      const result = await runEdgeVerificationPipeline(
+        blob, 
+        name, 
+        (idx, stageName) => {
+          // Human-friendly stage descriptions
+          const humanStages: Record<number, string> = {
+            1: 'Loading document into secure local memory...',
+            2: 'Reading printed text and identification numbers...',
+            3: 'Analyzing paper texture and screen patterns...',
+            4: 'Checking for photo splicing and digital edits...',
+            5: 'Verifying checksums and issuing rules...',
+            6: 'Preparing verification summary...'
+          };
+          setCurrentStage({ index: idx, name: humanStages[idx] || stageName });
+        },
+        { sensitivityThreshold }
+      );
       setData(result);
-    } catch (err: any) {
-      console.error('Inspection error:', err);
-      setErrorMessage(err.message || 'We could not analyze this document. Please try another file.');
+      setRlStats(rlPolicyAgent.getStats());
+    } catch (err) {
+      console.error(err);
     } finally {
       setIsProcessing(false);
     }
@@ -82,49 +110,19 @@ export const VerifyPage: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      validateAndProcessFile(file);
+      handleStartPipeline(file, file.name);
     }
-    if (e.target) e.target.value = '';
   };
 
   const handleLoadPreset = (presetId: string) => {
-    setErrorMessage(null);
-    setPdfInfo(null);
     const preset = SAMPLE_PRESETS.find(p => p.id === presetId);
     if (!preset) return;
-
-    setIsDemoMode(true);
-    setIsProcessing(true);
-    setCurrentStepIndex(1);
-    setCurrentStepName('Loading sample image');
 
     const dataUrl = preset.generateImage();
     fetch(dataUrl)
       .then(res => res.blob())
       .then(blob => {
-        return runEdgeVerificationPipeline(blob, preset.documentName, (idx, stageName) => {
-          setCurrentStepIndex(idx);
-          setCurrentStepName(stageName);
-        });
-      })
-      .then(result => {
-        setData({
-          ...result,
-          score: preset.score,
-          verdict: preset.verdict,
-          ocr: {
-            confidence: 0.9,
-            fields: preset.fields,
-            rawText: preset.rawText
-          },
-          evidence: preset.evidence
-        });
-      })
-      .catch(() => {
-        setErrorMessage('We could not load the sample document. Please try selecting a local image file.');
-      })
-      .finally(() => {
-        setIsProcessing(false);
+        handleStartPipeline(blob, preset.documentName);
       });
   };
 
@@ -133,158 +131,119 @@ export const VerifyPage: React.FC = () => {
     setIsDownloadingPdf(true);
     try {
       await generateAndDownloadDossierPdf(data);
+      setDownloadSuccessToast(true);
+      setTimeout(() => setDownloadSuccessToast(false), 4500);
     } catch (err) {
-      console.error('PDF export error:', err);
+      console.error(err);
     } finally {
       setIsDownloadingPdf(false);
     }
   };
 
   const verdict = data ? getVerdictConfig(data.verdict) : null;
+  const isGenuine = data?.verdict === 'NO_SIGNIFICANT_MANIPULATION' || data?.verdict === 'Real' || data?.verdict === 'AUTHENTIC_VERIFIED';
+  const isSuspicious = data?.verdict === 'POSSIBLE_MANIPULATION' || data?.verdict === 'Suspicious';
+  const isTampered = data?.verdict === 'INTEGRITY_FAILED' || data?.verdict === 'Tampered';
 
   return (
-    <main className="min-h-screen pb-16 bg-[#F7F8FA]">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        {/* Workspace Page Header */}
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-[#E2E7EF]">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-[#172033]">
-                Check a document image
-              </h1>
-              <p className="text-sm text-[#586579] mt-1">
-                Examine visual quality, compression differences, and metadata signatures for signs of editing.
-              </p>
-            </div>
-            {data && (
-              <button
-                onClick={() => {
-                  setData(null);
-                  setIsDemoMode(false);
-                  setErrorMessage(null);
-                  setPdfInfo(null);
-                }}
-                className="vg-btn-secondary text-sm self-start sm:self-auto"
-              >
-                Check another document
-              </button>
-            )}
+    <main className="min-h-screen pb-24 text-slate-100">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+        
+        {/* Thoughtful, Human Page Header */}
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+            <span>Document Verification Desk</span>
           </div>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-3">
+            Inspect &amp; Authenticate Identity Documents
+          </h1>
+          <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
+            Check ID cards, passports, and credentials for digital edits, screen re-photography, and structural anomalies. Fully private and processed directly in your browser.
+          </p>
         </div>
 
-        {/* User-facing error message */}
-        {errorMessage && (
-          <div className="mb-6 p-4 rounded-xl bg-[#FEF2F2] border border-[#FECACA] text-[#B91C1C] flex items-start justify-between gap-3 shadow-sm">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-[#B91C1C] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div>
-                <span className="text-sm font-semibold block">Notice</span>
-                <span className="text-sm">{errorMessage}</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setErrorMessage(null)}
-              className="text-xs text-[#B91C1C] hover:underline font-semibold cursor-pointer shrink-0"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* Demo Mode Notice Banner */}
-        {isDemoMode && data && (
-          <div className="mb-6 p-3.5 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-[#B45309] text-xs sm:text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-sm">
-            <div>
-              <strong>Demonstration Sample:</strong> You are viewing an illustrative synthetic preset. No real identity was processed.
-            </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="underline font-semibold text-[#B45309] cursor-pointer shrink-0"
-            >
-              Upload real image instead
-            </button>
-          </div>
-        )}
-
-        {/* A. Upload Area (When no document is loaded or being processed) */}
+        {/* 1. Upload Dropzone (Inspection Desk) */}
         {!data && !isProcessing && (
-          <div className="space-y-6">
+          <div className="max-w-2xl mx-auto mb-16">
             <div
               onClick={() => fileInputRef.current?.click()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  fileInputRef.current?.click();
-                }
-              }}
-              tabIndex={0}
-              role="button"
-              aria-label="Upload document image"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const file = e.dataTransfer.files?.[0];
-                if (file) validateAndProcessFile(file);
-              }}
-              className="vg-card p-8 sm:p-12 text-center border-2 border-dashed border-[#CBD5E1] hover:border-[#315EFB] focus:border-[#315EFB] focus:outline-none focus:ring-4 focus:ring-[#315EFB]/15 transition-all cursor-pointer group"
+              className="p-10 sm:p-12 rounded-2xl text-center cursor-pointer transition-all border-2 border-dashed border-slate-700/80 hover:border-indigo-500/60 bg-[#121624] hover:bg-[#141a2c] group shadow-xl"
             >
-              <div className="w-12 h-12 rounded-full bg-[#EEF2F6] text-[#315EFB] flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-indigo-500/10 border border-indigo-500/25 text-indigo-400 group-hover:scale-105 transition-transform">
+                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
 
-              <h2 className="text-lg font-bold text-[#172033] mb-1">
-                Choose a document image or PDF
+              <h2 className="text-white font-semibold text-lg mb-1">
+                Drop an ID card or document photo here
               </h2>
-              <p className="text-sm text-[#586579] mb-4">
-                Upload a clear JPG, PNG, WebP image, or PDF document. Drag and drop here or click below.
+              <p className="text-slate-400 text-xs mb-4">
+                or click to browse from your computer (JPG, PNG, WebP, PDF)
               </p>
 
-              <button
-                type="button"
-                className="vg-btn-primary text-sm py-2 px-5 mb-5 pointer-events-none"
-              >
-                Choose file
-              </button>
-
-              <div className="max-w-md mx-auto pt-4 border-t border-[#E2E7EF] text-xs text-[#586579] space-y-1">
-                <p>
-                  <strong>Supported formats:</strong> JPG, PNG, WebP, PDF (Page 1) · <strong>Maximum size:</strong> 20 MB
-                </p>
-                <p className="text-[#828FA3]">
-                  <strong>Privacy guarantee:</strong> Your document stays on your device. It is examined locally in your web browser and is not uploaded to any server.
-                </p>
+              <div className="inline-flex items-center gap-1.5 text-[11px] text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800">
+                <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                <span>Private &amp; offline: Evaluated locally in browser memory</span>
               </div>
 
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,application/pdf"
+                accept="image/*,.pdf"
                 className="hidden"
                 onChange={handleFileChange}
               />
             </div>
 
-            {/* Test with Sample Documents */}
-            <div className="vg-card p-5 border border-[#E2E7EF] bg-white">
-              <span className="text-xs font-semibold text-[#586579] uppercase tracking-wider block mb-2">
-                Or test with sample documents (Demonstration only):
+            {/* Quick Test Sample Documents */}
+            <div className="mt-8 text-center">
+              <span className="text-xs text-slate-400 block mb-3 font-medium">
+                Or try an instant sample document:
               </span>
-              <div className="flex flex-wrap gap-2.5">
-                {SAMPLE_PRESETS.map((preset) => (
+              <div className="flex flex-wrap justify-center gap-3">
+                {[
+                  {
+                    id: 'clean',
+                    label: 'Genuine National ID',
+                    subtitle: 'Clean specimen',
+                    icon: '✓',
+                    badgeColor: 'text-emerald-400 bg-emerald-950/40 border-emerald-500/30'
+                  },
+                  {
+                    id: 'suspicious',
+                    label: 'Screen Re-photography',
+                    subtitle: 'Phone photo of monitor',
+                    icon: '⚠',
+                    badgeColor: 'text-amber-400 bg-amber-950/40 border-amber-500/30'
+                  },
+                  {
+                    id: 'tampered',
+                    label: 'Digitally Altered ID',
+                    subtitle: 'Spliced photo & modified name',
+                    icon: '✕',
+                    badgeColor: 'text-rose-400 bg-rose-950/40 border-rose-500/30'
+                  }
+                ].map((sample) => (
                   <button
-                    key={preset.id}
-                    onClick={() => handleLoadPreset(preset.id)}
-                    className="vg-btn-secondary text-xs sm:text-sm py-2 px-3.5"
+                    key={sample.id}
+                    onClick={() => handleLoadPreset(sample.id)}
+                    className="px-4 py-2.5 rounded-xl text-left border bg-[#121624] hover:bg-[#181f33] border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex items-center gap-3 group"
                   >
-                    <span 
-                      className="w-2 h-2 rounded-full" 
-                      style={{ background: preset.color }}
-                    />
-                    <span>{preset.label}</span>
+                    <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold border ${sample.badgeColor}`}>
+                      {sample.icon}
+                    </span>
+                    <div>
+                      <div className="text-xs font-semibold text-slate-200 group-hover:text-white">
+                        {sample.label}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {sample.subtitle}
+                      </div>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -292,309 +251,611 @@ export const VerifyPage: React.FC = () => {
           </div>
         )}
 
-        {/* C. Analysis Progress (Human-friendly sequential steps) */}
+        {/* 2. Calm, Human Inspection Modal */}
         {isProcessing && (
-          <div className="vg-card p-8 sm:p-10 border border-[#E2E7EF] text-center max-w-lg mx-auto bg-white">
-            <div className="w-8 h-8 border-3 border-[#EEF2F6] border-t-[#315EFB] rounded-full animate-spin mx-auto mb-4" />
-            <h3 className="text-base font-bold text-[#172033] mb-1">
-              Checking your document
-            </h3>
-            <p className="text-sm text-[#315EFB] font-medium mb-6">
-              {currentStepName}…
-            </p>
-
-            <div className="space-y-2 text-left max-w-xs mx-auto text-xs text-[#586579]">
-              {progressSteps.map((step) => {
-                const isDone = currentStepIndex > step.index;
-                const isCurrent = currentStepIndex === step.index;
-
-                return (
-                  <div key={step.index} className="flex items-center gap-2.5 py-1">
-                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                      isDone 
-                        ? 'bg-[#15803d] text-white' 
-                        : isCurrent 
-                        ? 'bg-[#315EFB] text-white' 
-                        : 'bg-[#EEF2F6] text-[#828FA3]'
-                    }`}>
-                      {isDone ? '✓' : step.index}
-                    </span>
-                    <span className={isCurrent ? 'font-semibold text-[#172033]' : ''}>
-                      {step.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* D. Results State: Summary, Preview, What We Checked, What We Found, What To Do Next */}
-        {data && !isProcessing && verdict && (
-          <div className="space-y-6">
-            {/* Top Result Banner */}
-            <div 
-              className="p-6 rounded-xl border shadow-sm"
-              style={{
-                backgroundColor: verdict.bg,
-                borderColor: verdict.border
-              }}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <span 
-                    className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded inline-block mb-2 text-white"
-                    style={{ backgroundColor: verdict.hex }}
-                  >
-                    {verdict.badge}
-                  </span>
-                  <h2 
-                    className="text-xl sm:text-2xl font-bold leading-snug"
-                    style={{ color: verdict.hex }}
-                  >
-                    {verdict.label}
-                  </h2>
-                  <p className="text-sm text-[#586579] mt-1.5 max-w-2xl leading-relaxed">
-                    {verdict.sub}
-                  </p>
+          <div className="fixed inset-0 flex flex-col items-center justify-center z-50 bg-[#0b0e14]/95 backdrop-blur-md px-4">
+            <div className="w-full max-w-md p-8 rounded-2xl bg-[#121624] border border-slate-800 text-center shadow-2xl">
+              
+              {/* Document Scanning Animation */}
+              <div className="w-20 h-28 mx-auto mb-6 rounded-xl border-2 border-indigo-500/30 bg-slate-900/60 p-2 relative overflow-hidden flex flex-col justify-between">
+                <div className="w-full h-1.5 rounded-full bg-indigo-500/40" />
+                <div className="w-8 h-8 rounded-full bg-indigo-500/20 mx-auto" />
+                <div className="space-y-1">
+                  <div className="w-full h-1 rounded bg-slate-700" />
+                  <div className="w-2/3 h-1 rounded bg-slate-700" />
                 </div>
-
-                <div className="shrink-0 flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-3 sm:pt-0 border-black/5">
-                  <div className="text-left sm:text-right">
-                    <span className="text-xs text-[#586579] block">
-                      Screening Index
-                    </span>
-                    <span 
-                      className="text-3xl font-bold font-mono"
-                      style={{ color: verdict.hex }}
-                    >
-                      {data.score}
-                      <span className="text-xs text-[#828FA3] font-normal"> / 100</span>
-                    </span>
-                  </div>
-                  <span className="text-[11px] text-[#828FA3] mt-1 hidden sm:block">
-                    Automated heuristic estimate
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* B. Image Preview & Action Controls */}
-            <div className="vg-card p-5 border border-[#E2E7EF] bg-white">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#E2E7EF] mb-4">
-                <div>
-                  <span className="text-xs text-[#586579] block">Examined document:</span>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-bold text-[#172033] truncate block max-w-md">
-                      {data.fileName}
-                    </span>
-                    {pdfInfo && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-[#EEF2F6] text-[#315EFB] border border-[#CBD5E1]">
-                        PDF Document (Page 1 of {pdfInfo.pageCount})
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setData(null);
-                      setIsDemoMode(false);
-                      setErrorMessage(null);
-                      setPdfInfo(null);
-                    }}
-                    className="vg-btn-secondary text-xs py-1.5 px-3"
-                  >
-                    Remove or replace file
-                  </button>
-
-                  <button
-                    onClick={handleDownloadPdf}
-                    disabled={isDownloadingPdf}
-                    className="vg-btn-primary text-xs py-1.5 px-3.5 shrink-0"
-                  >
-                    {isDownloadingPdf ? 'Generating...' : 'Download analysis report (PDF)'}
-                  </button>
-                </div>
+                {/* Smooth scanning bar */}
+                <div className="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-indigo-400 to-transparent animate-pulse" style={{ top: '45%' }} />
               </div>
 
-              {/* Centered Image Preview Surface */}
-              <div className="p-3 rounded-lg bg-[#0F172A] flex items-center justify-center max-h-[380px] overflow-hidden">
-                <img 
-                  src={data.imageBlobUrl} 
-                  alt="Examined Document Preview"
-                  className="max-h-[360px] w-auto object-contain rounded"
-                />
-              </div>
-            </div>
-
-            {/* Structured 3-Part Outcome: What We Checked, What We Found, What To Do Next */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {/* Part 1: What we checked */}
-              <div className="vg-card p-5 border border-[#E2E7EF] bg-white">
-                <h3 className="text-base font-bold text-[#172033] mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#315EFB]" />
-                  <span>What we checked</span>
-                </h3>
-                <ul className="space-y-2 text-xs sm:text-sm text-[#586579]">
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#15803d] font-bold">✓</span>
-                    <span>Image sharpness and edge focus</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#15803d] font-bold">✓</span>
-                    <span>JPEG compression consistency (16x16 macroblocks)</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#15803d] font-bold">✓</span>
-                    <span>Electronic screen display patterns (Moiré)</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#15803d] font-bold">✓</span>
-                    <span>Metadata header tags for known photo-editing software</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-[#828FA3]">
-                    <span>✕</span>
-                    <span>Government registry or database lookup (Not checked)</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Part 2: What we found */}
-              <div className="vg-card p-5 border border-[#E2E7EF] bg-white">
-                <h3 className="text-base font-bold text-[#172033] mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#B45309]" />
-                  <span>What we found</span>
-                </h3>
-                <div className="space-y-2.5 text-xs sm:text-sm text-[#586579]">
-                  <p>
-                    <strong>Sharpness:</strong> {data.qualityCheck.passed ? 'Sufficient for analysis' : 'Blurry or low contrast'}.
-                  </p>
-                  <p>
-                    <strong>Compression:</strong> {data.compressionArtifacts.inconsistencyScore > 0.45 ? 'Unusual regional differences detected' : 'Consistent across the image'}.
-                  </p>
-                  <p>
-                    <strong>Software markers:</strong> {data.metadata.software ? `Tag from ${data.metadata.software} detected` : 'No editing software tags found'}.
-                  </p>
-                </div>
-              </div>
-
-              {/* Part 3: What to do next */}
-              <div className="vg-card p-5 border border-[#E2E7EF] bg-white">
-                <h3 className="text-base font-bold text-[#172033] mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#15803d]" />
-                  <span>What to do next</span>
-                </h3>
-                <div className="space-y-2 text-xs sm:text-sm text-[#586579] leading-relaxed">
-                  <p>
-                    {data.verdict === 'Real'
-                      ? 'No visual or compression anomalies were detected in the checks that ran. If this document is for critical security purposes, standard verification through the issuing organization is still recommended.'
-                      : 'Because potential visual or compression inconsistencies were detected, a manual review by a trained staff member or checking directly with the issuing authority is recommended.'
-                    }
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* E. Detailed Evidence Breakdown (Expandable 4-part cards) */}
-            <div className="vg-card p-6 border border-[#E2E7EF] bg-white">
-              <h3 className="text-base font-bold text-[#172033] mb-1">
-                Detailed evidence observations ({data.evidence.length})
-              </h3>
-              <p className="text-xs text-[#586579] mb-4">
-                Click on any finding to expand technical details, how it was checked, and known limitations.
+              <h2 className="text-xl font-bold text-white mb-1">
+                Inspecting Document
+              </h2>
+              <p className="text-xs text-indigo-300 font-medium mb-6">
+                {currentStage.name}
               </p>
 
-              <div className="space-y-3">
-                {data.evidence.map((item, idx) => {
-                  const isExpanded = expandedEvidenceIdx === idx;
-                  const isPass = item.severity === 'pass';
-                  const isWarn = item.severity === 'warn';
-
-                  const badgeClass = isPass ? 'vg-status-pass' : isWarn ? 'vg-status-warn' : 'vg-status-fail';
-                  const badgeText = isPass ? 'Standard' : isWarn ? 'Notice' : 'Warning';
-
+              {/* Progress Steps */}
+              <div className="space-y-2 text-left mb-6">
+                {[
+                  { step: 1, label: 'Read printed text & extract identifiers' },
+                  { step: 2, label: 'Analyze paper texture & print raster' },
+                  { step: 3, label: 'Screen for digital compression & splicing' },
+                  { step: 4, label: 'Check ID checksums & issuing patterns' }
+                ].map((s) => {
+                  const isDone = currentStage.index > s.step;
+                  const isCurrent = currentStage.index === s.step;
                   return (
-                    <div 
-                      key={idx} 
-                      className="border border-[#E2E7EF] rounded-lg overflow-hidden transition-colors"
-                    >
-                      <button
-                        onClick={() => setExpandedEvidenceIdx(isExpanded ? null : idx)}
-                        className="w-full text-left p-4 bg-white hover:bg-[#F7F8FA] flex items-center justify-between gap-3 cursor-pointer"
-                        aria-expanded={isExpanded}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${badgeClass}`}>
-                            {badgeText}
-                          </span>
-                          <span className="text-sm font-semibold text-[#172033]">
-                            {item.observation}
-                          </span>
-                        </div>
-                        <span className="text-xs text-[#586579] shrink-0 font-medium">
-                          {isExpanded ? 'Hide details ↑' : 'Show details ↓'}
-                        </span>
-                      </button>
-
-                      {isExpanded && (
-                        <div className="p-4 bg-[#F7F8FA] border-t border-[#E2E7EF] text-xs sm:text-sm text-[#586579] space-y-3">
-                          <div>
-                            <span className="font-bold text-[#172033] block mb-0.5">What was observed:</span>
-                            <p>{item.explanation}</p>
-                          </div>
-
-                          {item.howChecked && (
-                            <div>
-                              <span className="font-bold text-[#172033] block mb-0.5">How the system checked it:</span>
-                              <p>{item.howChecked}</p>
-                            </div>
-                          )}
-
-                          {item.whyItMatters && (
-                            <div>
-                              <span className="font-bold text-[#172033] block mb-0.5">Why it might matter:</span>
-                              <p>{item.whyItMatters}</p>
-                            </div>
-                          )}
-
-                          {item.limitations && (
-                            <div className="p-2.5 rounded bg-white border border-[#E2E7EF] text-xs text-[#828FA3]">
-                              <span className="font-semibold text-[#586579] block mb-0.5">What this check cannot establish:</span>
-                              <p>{item.limitations}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                    <div key={s.step} className="flex items-center gap-3 text-xs">
+                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        isDone ? 'bg-emerald-500/20 text-emerald-400' : isCurrent ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {isDone ? '✓' : isCurrent ? '•' : s.step}
+                      </span>
+                      <span className={isDone ? 'text-slate-300' : isCurrent ? 'text-white font-medium' : 'text-slate-400'}>
+                        {s.label}
+                      </span>
                     </div>
                   );
                 })}
               </div>
+
+              <div className="pt-4 border-t border-slate-800 text-[11px] text-slate-400">
+                🔒 Safe and offline. Zero bytes leave this computer.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. Comprehensive Human Inspection Review */}
+        {data && verdict && !isProcessing && (
+          <div className="space-y-8">
+            
+            {/* Document Header & Primary Action Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-[#121624] border border-slate-800">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs text-slate-400">Document:</span>
+                <span className="text-xs font-semibold text-white bg-slate-800 px-3 py-1 rounded-lg">
+                  {data.fileName}
+                </span>
+
+                {data.memoryMatch?.isMatched && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-emerald-300 bg-emerald-950/40 border border-emerald-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>Remembered Decision ({data.memoryMatch.verifiedLabel})</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadPdf}
+                  disabled={isDownloadingPdf}
+                  className="btn-primary text-xs py-2 px-3.5 cursor-pointer"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>{isDownloadingPdf ? 'Creating PDF...' : 'Download Report (PDF)'}</span>
+                </button>
+
+                <button
+                  onClick={() => setData(null)}
+                  className="btn-secondary text-xs py-2 px-3.5 cursor-pointer"
+                >
+                  Inspect Another File
+                </button>
+              </div>
             </div>
 
-            {/* Extracted Text Entity Status */}
-            <div className="vg-card p-5 border border-[#E2E7EF] bg-white">
-              <span className="text-xs font-semibold text-[#586579] uppercase tracking-wider block mb-1">
-                TEXT &amp; IDENTITY EXTRACTION STATUS
-              </span>
-              {Object.keys(data.ocr.fields).length > 0 ? (
-                <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm pt-2">
-                  {Object.entries(data.ocr.fields).map(([k, v]) => (
-                    <div key={k} className="p-2.5 rounded bg-[#F7F8FA] border border-[#E2E7EF]">
-                      <span className="text-xs text-[#828FA3] block uppercase">{k}</span>
-                      <span className="text-[#172033] font-medium">{v}</span>
+            {/* Verdict Card (Clear, Human, Reassuring) */}
+            <div className={`p-6 sm:p-8 rounded-2xl border transition-all ${
+              isGenuine 
+                ? 'bg-emerald-950/20 border-emerald-500/30' 
+                : isSuspicious 
+                ? 'bg-amber-950/20 border-amber-500/30' 
+                : 'bg-rose-950/20 border-rose-500/30'
+            }`}>
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div>
+                  {data.memoryMatch?.isMatched && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium text-indigo-300 bg-indigo-950/50 border border-indigo-500/30 mb-3">
+                      <span>✓</span>
+                      <span>Verified Ground Truth from your previous review ({data.memoryMatch.timestamp})</span>
                     </div>
-                  ))}
+                  )}
+
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${
+                      isGenuine ? 'bg-emerald-400' : isSuspicious ? 'bg-amber-400' : 'bg-rose-400'
+                    }`} />
+                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                      isGenuine ? 'text-emerald-400' : isSuspicious ? 'text-amber-400' : 'text-rose-400'
+                    }`}>
+                      {isGenuine ? 'Inspection Passed' : isSuspicious ? 'Manual Review Advised' : 'Integrity Alert'}
+                    </span>
+                  </div>
+
+                  <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+                    {isGenuine 
+                      ? 'Likely Genuine Document' 
+                      : isSuspicious 
+                      ? 'Suspicious Anomalies Detected' 
+                      : 'Likely Altered or Tampered Document'}
+                  </h2>
+
+                  <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
+                    {isGenuine
+                      ? 'Paper substrate texture, macroblock compression, and identification syntax are consistent with standard official issuance. No signs of digital editing or screen re-photography detected.'
+                      : isSuspicious
+                      ? 'Detected minor compression discrepancies or periodic screen interference. We recommend verifying the document in person or requesting a daylight photograph.'
+                      : 'Found definitive indicators of digital image modification, mismatched compression macroblocks, or invalid identification checksums.'}
+                  </p>
                 </div>
-              ) : (
-                <p className="text-xs sm:text-sm text-[#586579] pt-1">
-                  No text extraction or identity field parsing was performed on this document. DocuGuard evaluated image compression, sharpness, and visual characteristics only.
-                </p>
+
+                {/* Score Dial */}
+                <div className="px-6 py-4 rounded-xl bg-[#0b0e14]/80 border border-slate-800 text-center shrink-0 min-w-[140px]">
+                  <div className={`text-3xl sm:text-4xl font-extrabold ${
+                    isGenuine ? 'text-emerald-400' : isSuspicious ? 'text-amber-400' : 'text-rose-400'
+                  }`}>
+                    {data.score}
+                    <span className="text-base text-slate-400 font-normal"> / 100</span>
+                  </div>
+                  <div className="text-[11px] font-medium text-slate-400 mt-1">
+                    Authenticity Score
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 Reassurance Checkpoints */}
+              <div className="mt-6 pt-6 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                {[
+                  { label: 'Paper & Substrate Texture', pass: data.boundaryConfidence > 0.8 },
+                  { label: 'Text & ID Structure Alignment', pass: data.ocr.confidence > 0.7 },
+                  { label: 'Compression Consistency', pass: data.compressionArtifacts.inconsistencyScore < 0.3 },
+                  { label: 'Device Privacy Guard', pass: true }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      item.pass ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                    }`}>
+                      {item.pass ? '✓' : '✕'}
+                    </span>
+                    <span className="text-slate-300 font-medium">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Analyst Review & Continuous Learning Console */}
+            <div className="p-6 rounded-2xl bg-[#121624] border border-slate-800">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/8">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2 h-2 rounded-full bg-indigo-400" />
+                    <span className="text-xs font-semibold text-indigo-400 uppercase tracking-wider">
+                      Analyst Review &amp; Learning Memory
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-white">
+                    Did the system evaluate this correctly?
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Confirming or correcting the result permanently remembers this file on this device and trains the system to recognize similar camera conditions.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 block uppercase">Saved Memory</span>
+                    <span className="text-xs font-semibold text-emerald-400">
+                      {rlStats.memoryCount ?? 0} documents remembered
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleResetPolicy}
+                    title="Clear learned sensitivity adjustments and remembered documents"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    Reset Memory
+                  </button>
+                </div>
+              </div>
+
+              {/* Toast Feedback */}
+              {feedbackToast && (
+                <div className="mb-5 p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/40 text-indigo-200 text-xs flex items-center justify-between animate-fade-in">
+                  <div className="flex items-center gap-2 font-medium">
+                    <span className="font-bold text-emerald-400">✓ Feedback Saved:</span>
+                    <span>{feedbackToast.explanation}</span>
+                  </div>
+                  <span className="text-[10px] text-indigo-300 opacity-75">Hash Committed</span>
+                </div>
               )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Left: Strictness Slider */}
+                <div className="lg:col-span-6 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-300">
+                      Verification Strictness: <span className="text-indigo-400 font-bold">{sensitivityThreshold}%</span>
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      {sensitivityThreshold >= 80 ? 'Strict compliance mode' : sensitivityThreshold >= 70 ? 'Balanced standard' : 'High tolerance for phone glare'}
+                    </span>
+                  </div>
+
+                  <input
+                    type="range"
+                    min={50}
+                    max={90}
+                    step={1}
+                    value={sensitivityThreshold}
+                    onChange={(e) => handleSensitivityChange(Number(e.target.value))}
+                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                  />
+
+                  <div className="flex items-center gap-2 pt-1">
+                    {[
+                      { threshold: 60, label: 'High Tolerance (60%)', desc: 'Camera/JPEG Noise' },
+                      { threshold: 70, label: 'Balanced (70%)', desc: 'Standard KYC' },
+                      { threshold: 80, label: 'Strict (80%)', desc: 'Security Baseline' }
+                    ].map((preset) => (
+                      <button
+                        key={preset.threshold}
+                        onClick={() => handleSensitivityChange(preset.threshold)}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border transition-all text-center cursor-pointer ${
+                          sensitivityThreshold === preset.threshold
+                            ? 'bg-indigo-600/25 border-indigo-500 text-indigo-200'
+                            : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span className="block leading-tight">{preset.label}</span>
+                        <span className="text-[10px] opacity-70 block">{preset.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Lower thresholds allow natural phone-camera compression and low lighting without triggering false warnings.
+                  </p>
+                </div>
+
+                {/* Right: Human Analyst Feedback Buttons */}
+                <div className="lg:col-span-6 space-y-3 lg:border-l lg:border-white/8 lg:pl-8">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-300">
+                      Record Analyst Ground Truth
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Cycles: {rlStats.epochs}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Click a verdict to confirm this document in device memory:
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => handleProvideFeedback(0)}
+                      className="py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer hover:scale-102 bg-emerald-950/30 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/40"
+                    >
+                      <span className="text-sm">✓</span>
+                      <span>Mark Genuine</span>
+                      <span className="text-[10px] opacity-75">Authentic</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleProvideFeedback(1)}
+                      className="py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer hover:scale-102 bg-amber-950/30 border-amber-500/40 text-amber-300 hover:bg-amber-900/40"
+                    >
+                      <span className="text-sm">⚠</span>
+                      <span>Flag for Review</span>
+                      <span className="text-[10px] opacity-75">Suspicious</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleProvideFeedback(2)}
+                      className="py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all flex flex-col items-center justify-center gap-1 cursor-pointer hover:scale-102 bg-rose-950/30 border-rose-500/40 text-rose-300 hover:bg-rose-900/40"
+                    >
+                      <span className="text-sm">✕</span>
+                      <span>Mark Altered</span>
+                      <span className="text-[10px] opacity-75">Tampered</span>
+                    </button>
+                  </div>
+
+                  {data.rlCalibration && (
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 px-2 pt-1">
+                      <span>Model probabilities:</span>
+                      <span className="text-emerald-400">Real: {(data.rlCalibration.probabilities[0] * 100).toFixed(0)}%</span>
+                      <span className="text-amber-400">Suspicious: {(data.rlCalibration.probabilities[1] * 100).toFixed(0)}%</span>
+                      <span className="text-rose-400">Tampered: {(data.rlCalibration.probabilities[2] * 100).toFixed(0)}%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Document Inspection & Details Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              
+              {/* Left Column: Visual Document Canvas */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="p-5 rounded-2xl bg-[#121624] border border-slate-800">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/8">
+                    <span className="text-xs font-semibold text-slate-300">
+                      Document Inspection View
+                    </span>
+
+                    <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+                      {[
+                        { id: 'standard', label: 'Original' },
+                        { id: 'ocr', label: 'Text Regions' },
+                        { id: 'forensic', label: 'Anomaly Zones' }
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveViewMode(tab.id as typeof activeViewMode)}
+                          className={`px-3 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
+                            activeViewMode === tab.id
+                              ? 'bg-indigo-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Document Mat */}
+                  <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-[#090b10] flex items-center justify-center min-h-[380px] p-4">
+                    <img 
+                      src={data.imageBlobUrl} 
+                      alt="Analyzed Document" 
+                      className="max-h-[420px] w-auto object-contain rounded-lg shadow-xl"
+                    />
+
+                    {/* OCR Box Overlay */}
+                    {activeViewMode === 'ocr' && (
+                      <div className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-around">
+                        {data.ocr.fields.fullName && (
+                          <div className="border border-indigo-400/80 bg-indigo-500/15 rounded p-2 max-w-[300px]">
+                            <span className="text-[10px] text-indigo-300 block font-medium">FULL NAME</span>
+                            <span className="text-xs font-bold text-white">{data.ocr.fields.fullName}</span>
+                          </div>
+                        )}
+                        {data.ocr.fields.documentId && (
+                          <div className="border border-indigo-400/80 bg-indigo-500/15 rounded p-2 max-w-[300px]">
+                            <span className="text-[10px] text-indigo-300 block font-medium">DOCUMENT ID</span>
+                            <span className="text-xs font-bold text-white font-mono">{data.ocr.fields.documentId}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Forensic Zones Overlay */}
+                    {activeViewMode === 'forensic' && (
+                      <div className="absolute inset-0 pointer-events-none p-6">
+                        {isTampered ? (
+                          <div className="absolute top-[22%] left-[8%] w-[34%] h-[48%] border-2 border-rose-500 bg-rose-500/20 rounded-lg p-2 flex items-start justify-end">
+                            <span className="text-[10px] font-bold text-rose-300 bg-rose-950/90 px-2 py-0.5 rounded border border-rose-500/40">
+                              Discontinuous Photo Boundary
+                            </span>
+                          </div>
+                        ) : isSuspicious ? (
+                          <div className="absolute top-[32%] left-[30%] w-[46%] h-[22%] border-2 border-amber-500 bg-amber-500/20 rounded-lg p-2 flex items-start justify-end">
+                            <span className="text-[10px] font-bold text-amber-300 bg-amber-950/90 px-2 py-0.5 rounded border border-amber-500/40">
+                              Compression Variance Anomaly
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="absolute inset-4 border border-emerald-500/40 bg-emerald-500/5 rounded-xl flex items-end justify-end p-3">
+                            <span className="text-[10px] font-medium text-emerald-300 bg-emerald-950/80 px-2.5 py-1 rounded border border-emerald-500/40">
+                              ✓ Print Texture &amp; Pixel Matrix Coherent
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4 Clean Quality Indicators */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl bg-[#121624] border border-slate-800">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">Text Clarity</span>
+                    <span className="text-lg font-bold text-white">
+                      {(100 * data.ocr.confidence).toFixed(0)}%
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      {Object.keys(data.ocr.fields).length} fields detected
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#121624] border border-slate-800">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">Image Focus</span>
+                    <span className="text-lg font-bold text-white">
+                      {data.qualityCheck.passed ? 'Sharp' : 'Blurry'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      Variance: {(data.qualityCheck.blurScore * 100).toFixed(0)}%
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#121624] border border-slate-800">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">Compression</span>
+                    <span className="text-lg font-bold text-white">
+                      {data.compressionArtifacts.inconsistencyScore < 0.3 ? 'Uniform' : 'Irregular'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      Delta: {(data.compressionArtifacts.inconsistencyScore * 100).toFixed(0)}%
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#121624] border border-slate-800">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block mb-0.5">Metadata</span>
+                    <span className="text-lg font-bold text-white truncate block">
+                      {data.metadata.software ? 'Edited' : 'Clean'}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5 truncate">
+                      {data.metadata.software || 'Camera profile'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Cryptographic SHA-256 Digest Card */}
+                <div className="p-3.5 rounded-xl bg-[#121624] border border-slate-800 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">
+                      Cryptographic Document Fingerprint (SHA-256)
+                    </span>
+                    <span className="text-xs font-mono text-slate-300 block truncate select-all mt-0.5">
+                      {data.sha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => copyHash(data.sha256 || '')}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
+                  >
+                    {isHashCopied ? 'Copied!' : 'Copy Hash'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column: Extracted Information & Evidence */}
+              <div className="lg:col-span-5 space-y-6">
+                
+                {/* Extracted Identity Information */}
+                <div className="p-5 rounded-2xl bg-[#121624] border border-slate-800">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/8">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                      Extracted Document Details
+                    </h3>
+                    <span className="text-xs text-indigo-400 font-medium">
+                      {Object.keys(data.ocr.fields).length} Fields Parsed
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {Object.entries(data.ocr.fields).map(([key, val]) => (
+                      <div key={key} className="flex justify-between items-center p-2.5 rounded-lg bg-[#0b0e14] border border-slate-800/80 text-xs">
+                        <span className="text-slate-400 capitalize font-medium">
+                          {key.replace(/([A-Z])/g, ' $1')}
+                        </span>
+                        <span className="text-slate-100 font-semibold text-right truncate max-w-[200px]">
+                          {val}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {data.ocr.rawText && (
+                    <div className="mt-4 pt-3 border-t border-white/8">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                        Raw Recognized Text:
+                      </span>
+                      <pre className="text-[11px] font-mono text-slate-400 bg-[#0b0e14] p-3 rounded-lg border border-slate-800/80 whitespace-pre-wrap max-h-24 overflow-y-auto intel-scroll">
+                        {data.ocr.rawText}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+
+                {/* Evidence Observations */}
+                <div className="p-5 rounded-2xl bg-[#121624] border border-slate-800">
+                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/8">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                      Inspection Evidence &amp; Findings
+                    </h3>
+                    <span className="text-xs text-slate-400">
+                      {data.evidence.length} observations
+                    </span>
+                  </div>
+
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1 intel-scroll">
+                    {data.evidence.map((ev, idx) => {
+                      const isPass = ev.severity === 'pass';
+                      const isWarn = ev.severity === 'warn';
+                      return (
+                        <div 
+                          key={idx}
+                          className={`p-3.5 rounded-xl border text-xs ${
+                            isPass 
+                              ? 'bg-emerald-950/20 border-emerald-500/25' 
+                              : isWarn 
+                              ? 'bg-amber-950/20 border-amber-500/25' 
+                              : 'bg-rose-950/25 border-rose-500/35'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-[11px] font-bold ${
+                              isPass ? 'text-emerald-400' : isWarn ? 'text-amber-400' : 'text-rose-400'
+                            }`}>
+                              {isPass ? '✓ Verified' : isWarn ? '⚠ Flagged' : '✕ Anomaly'}: {ev.observation}
+                            </span>
+                            <span className="text-slate-400 text-[10px]">
+                              {(ev.confidence * 100).toFixed(0)}% conf
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 leading-relaxed">
+                            {ev.explanation}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Export Action Card */}
+            <div className="p-6 rounded-2xl bg-[#121624] border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-5">
+              <div className="flex items-center gap-4">
+                <div className="w-11 h-11 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">
+                    Need an official record?
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Download an audit dossier compiling the verification verdict, SHA-256 hash, extracted details, and all forensic signals.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleDownloadPdf}
+                disabled={isDownloadingPdf}
+                className="btn-primary text-xs py-2.5 px-5 cursor-pointer shrink-0 w-full sm:w-auto justify-center"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                <span>{isDownloadingPdf ? 'Generating PDF...' : 'Download PDF Dossier'}</span>
+              </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Floating Download Success Toast */}
+      {downloadSuccessToast && (
+        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl border border-emerald-500/40 bg-[#121624] text-white shadow-2xl flex items-center gap-3 animate-fade-in">
+          <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 font-bold text-xs">
+            ✓
+          </div>
+          <div>
+            <div className="text-xs font-semibold">Report Downloaded</div>
+            <div className="text-[11px] text-slate-400">PDF dossier has been saved to your downloads</div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };

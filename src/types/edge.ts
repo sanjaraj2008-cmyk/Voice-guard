@@ -1,4 +1,12 @@
-export type VerdictType = 'Real' | 'Suspicious' | 'Tampered';
+export type VerdictType = 
+  | 'Real' 
+  | 'Suspicious' 
+  | 'Tampered'
+  | 'NO_SIGNIFICANT_MANIPULATION'
+  | 'POSSIBLE_MANIPULATION'
+  | 'INCONCLUSIVE'
+  | 'INTEGRITY_FAILED'
+  | 'AUTHENTIC_VERIFIED';
 
 export interface VerdictConfig {
   hex: string;
@@ -11,16 +19,13 @@ export interface VerdictConfig {
 }
 
 export interface ForensicEvidenceItem {
-  category: 'texture' | 'compression' | 'metadata' | 'layout' | 'ocr';
+  category: 'texture' | 'compression' | 'metadata' | 'layout' | 'ocr' | 'cryptography';
   weight: number;
   observation: string;
   explanation: string;
   severity: 'pass' | 'warn' | 'fail';
   confidence: number;
-  // Human-centered 4-part breakdown
-  howChecked?: string;
-  whyItMatters?: string;
-  limitations?: string;
+  affectedRegion?: { x: number; y: number; width: number; height: number };
 }
 
 export interface OCRFields {
@@ -34,9 +39,43 @@ export interface OCRFields {
   [key: string]: string | undefined;
 }
 
+export interface ConceptEvaluation {
+  manipulationDetection: {
+    status: 'pass' | 'warn' | 'fail';
+    score: number;
+    details: string;
+  };
+  cryptographicIntegrity: {
+    status: 'pass' | 'warn' | 'fail';
+    sha256: string;
+    signatureFound: boolean;
+    details: string;
+  };
+  issuerVerification: {
+    status: 'NOT_PERFORMED' | 'VERIFIED' | 'FAILED';
+    provider: string;
+    details: string;
+  };
+  contentConsistency: {
+    status: 'pass' | 'warn' | 'fail';
+    checksumAlgorithm?: string;
+    details: string;
+  };
+  overallVerdict: {
+    category: 'No significant manipulation detected'
+      | 'Possible manipulation detected'
+      | 'Inconclusive'
+      | 'Integrity verification failed'
+      | 'Authenticity verified against a trusted source';
+    confidence: number;
+    recommendation: string;
+  };
+}
+
 export interface DocumentVerificationData {
   documentId: string;
   fileName: string;
+  sha256?: string;
   generatedAt: string;
   score: number; // 0 to 100
   verdict: VerdictType;
@@ -64,6 +103,31 @@ export interface DocumentVerificationData {
     confidence: number;
   };
   evidence: ForensicEvidenceItem[];
+  conceptEvaluation?: ConceptEvaluation;
+  aiModelPrediction?: {
+    verdict: string;
+    probabilities: [number, number, number];
+    forgeryScore: number;
+    inferenceTimeMs: number;
+  };
+  checksCompleted: string[];
+  checksUnavailable: string[];
+  analyzerVersion: string;
+  rlCalibration?: {
+    action: number;
+    verdict: VerdictType;
+    probabilities: [number, number, number];
+    featureVector: number[];
+    noisePenaltyMultiplier: number;
+    calibratedScore: number;
+  };
+  sensitivityThreshold?: number;
+  memoryMatch?: {
+    isMatched: boolean;
+    groundTruth: number;
+    timestamp: string;
+    verifiedLabel: string;
+  };
 }
 
 export interface SampleDocPreset {

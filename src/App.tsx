@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar, ActivePage } from './components/Navbar';
 import { Footer } from './components/Footer';
-import { LoadingScreen } from './components/LoadingScreen';
 import { HomePage } from './pages/HomePage';
 import { VerifyPage } from './pages/VerifyPage';
 import { HowItWorksPage } from './pages/HowItWorksPage';
@@ -11,7 +10,6 @@ import { SettingsPage } from './pages/SettingsPage';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<ActivePage>('home');
-  const [isLoading, setIsLoading] = useState(true);
 
   // Handle browser back/forward and hash changes if present
   useEffect(() => {
@@ -34,10 +32,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F7F8FA] text-[#172033] antialiased selection:bg-[#315EFB] selection:text-white font-sans">
-      {/* Initialization & Pre-warming Screen */}
-      {isLoading && <LoadingScreen onComplete={() => setIsLoading(false)} />}
-
+    <div className="min-h-screen flex flex-col bg-[#0b0e14] text-slate-100 antialiased selection:bg-indigo-600 selection:text-white font-sans">
       {/* Navigation Bar */}
       <Navbar currentPage={currentPage} onNavigate={handleNavigate} />
 

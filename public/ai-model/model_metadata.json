@@ -1,10 +1,7 @@
 {
-  "model_name": "DocuGuard_Forensic_CNN_RL",
-  "version": "2.0.0-rl-finetuned",
-  "status": "READY \u2014 RL fine-tuned with REINFORCE + calibrated score head",
-  "description": "Fine-tuned with Reinforcement Learning (REINFORCE policy gradient). Fixes the score collapse bug where all inputs produced ~95% credit. Score now represents calibrated confidence: 0\u201330 for real, 30\u201370 for suspicious, 70\u2013100 for tampered documents.",
-  "rl_method": "REINFORCE with reward shaping + entropy bonus",
-  "score_calibration": "Dynamic: based on softmax confidence, not fixed targets",
+  "model_name": "DocuGuard_Forensic_CNN",
+  "version": "1.2.0-trained",
+  "status": "READY -- Fully trained on multi-source forensic datasets (IMD2020 + Hugging Face AIForge-Doc-v1)",
   "input_size": 224,
   "classes": [
     "real",
@@ -12,168 +9,23 @@
     "tampered"
   ],
   "num_classes": 3,
-  "epochs_rl_trained": 15,
-  "best_val_accuracy_after_rl": 65.8,
-  "per_class_val_accuracy": {
-    "Real": 29.51,
-    "Suspicious": 0.0,
-    "Tampered": 95.71
-  },
-  "training_history": [
-    {
-      "epoch": 1,
-      "train_acc": 59.43,
-      "val_acc": 60.82,
-      "rl_loss": -0.2318,
-      "sup_loss": 1.0264,
-      "score_loss": 575.6217,
-      "entropy": 1.032
-    },
-    {
-      "epoch": 2,
-      "train_acc": 61.39,
-      "val_acc": 63.64,
-      "rl_loss": -0.3306,
-      "sup_loss": 1.0389,
-      "score_loss": 592.1806,
-      "entropy": 1.0068
-    },
-    {
-      "epoch": 3,
-      "train_acc": 64.14,
-      "val_acc": 62.55,
-      "rl_loss": -0.5044,
-      "sup_loss": 1.06,
-      "score_loss": 615.6354,
-      "entropy": 0.9588
-    },
-    {
-      "epoch": 4,
-      "train_acc": 63.24,
-      "val_acc": 62.99,
-      "rl_loss": -0.6961,
-      "sup_loss": 1.0994,
-      "score_loss": 634.1615,
-      "entropy": 0.8996
-    },
-    {
-      "epoch": 5,
-      "train_acc": 63.45,
-      "val_acc": 64.5,
-      "rl_loss": -0.9398,
-      "sup_loss": 1.1677,
-      "score_loss": 654.3645,
-      "entropy": 0.8292
-    },
-    {
-      "epoch": 6,
-      "train_acc": 63.24,
-      "val_acc": 64.5,
-      "rl_loss": -1.1521,
-      "sup_loss": 1.2111,
-      "score_loss": 664.7418,
-      "entropy": 0.7558
-    },
-    {
-      "epoch": 7,
-      "train_acc": 63.51,
-      "val_acc": 65.58,
-      "rl_loss": -1.3982,
-      "sup_loss": 1.3021,
-      "score_loss": 695.3516,
-      "entropy": 0.6842
-    },
-    {
-      "epoch": 8,
-      "train_acc": 63.98,
-      "val_acc": 65.58,
-      "rl_loss": -1.622,
-      "sup_loss": 1.3995,
-      "score_loss": 711.1239,
-      "entropy": 0.6339
-    },
-    {
-      "epoch": 9,
-      "train_acc": 63.88,
-      "val_acc": 65.37,
-      "rl_loss": -1.7705,
-      "sup_loss": 1.4486,
-      "score_loss": 716.8952,
-      "entropy": 0.5869
-    },
-    {
-      "epoch": 10,
-      "train_acc": 63.88,
-      "val_acc": 65.37,
-      "rl_loss": -1.9258,
-      "sup_loss": 1.501,
-      "score_loss": 719.0764,
-      "entropy": 0.5496
-    },
-    {
-      "epoch": 11,
-      "train_acc": 64.51,
-      "val_acc": 65.58,
-      "rl_loss": -2.0693,
-      "sup_loss": 1.5745,
-      "score_loss": 728.4207,
-      "entropy": 0.5173
-    },
-    {
-      "epoch": 12,
-      "train_acc": 64.57,
-      "val_acc": 65.58,
-      "rl_loss": -2.1319,
-      "sup_loss": 1.597,
-      "score_loss": 728.3239,
-      "entropy": 0.5053
-    },
-    {
-      "epoch": 13,
-      "train_acc": 64.35,
-      "val_acc": 65.15,
-      "rl_loss": -2.1666,
-      "sup_loss": 1.6212,
-      "score_loss": 722.6254,
-      "entropy": 0.4935
-    },
-    {
-      "epoch": 14,
-      "train_acc": 63.29,
-      "val_acc": 65.37,
-      "rl_loss": -2.165,
-      "sup_loss": 1.6291,
-      "score_loss": 735.3757,
-      "entropy": 0.491
-    },
-    {
-      "epoch": 15,
-      "train_acc": 64.41,
-      "val_acc": 65.8,
-      "rl_loss": -2.1697,
-      "sup_loss": 1.6152,
-      "score_loss": 727.192,
-      "entropy": 0.4884
-    }
+  "epochs_trained": 10,
+  "final_train_accuracy": 59.32,
+  "best_val_accuracy": 63.64,
+  "trained_samples": 1912,
+  "val_samples": 462,
+  "dataset_sources": [
+    "IMD2020 Real & Tampered",
+    "Hugging Face Scam-AI/AIForge-Doc-v1"
   ],
-  "frozen_layers": [
-    "conv1",
-    "bn1",
-    "conv2",
-    "bn2",
-    "conv3",
-    "bn3",
-    "conv4",
-    "bn4"
-  ],
-  "trainable_layers": [
-    "conv5",
-    "bn5",
-    "conv6_reduce",
-    "bn6",
-    "heatmap_conv",
-    "embedding_dense",
+  "output_heads": [
     "classification_output",
-    "score_output"
-  ]
+    "score_output",
+    "heatmap_output"
+  ],
+  "val_per_class_accuracy": {
+    "Real": 30.33,
+    "Suspicious": 25.0,
+    "Tampered": 81.07
+  }
 }

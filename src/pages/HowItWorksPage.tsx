@@ -7,129 +7,143 @@ interface HowItWorksPageProps {
 
 export const HowItWorksPage: React.FC<HowItWorksPageProps> = ({ onNavigate }) => {
   return (
-    <main className="min-h-screen pb-16 bg-[#F7F8FA]">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
-        {/* Page Header */}
-        <div className="mb-10 text-center max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-[#586579] bg-[#EEF2F6] border border-[#E2E7EF] mb-3">
-            <span>TECHNICAL OVERVIEW</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-[#172033] mb-3">
-            How DocuGuard Works
+    <main className="min-h-screen pb-24 text-slate-100">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-14">
+        {/* Header */}
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400 block mb-2">
+            Verification Methodology
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white tracking-tight mb-3">
+            How DocuGuard Evaluates Documents
           </h1>
-          <p className="text-base text-[#586579] leading-relaxed">
-            An open explanation of what runs on your computer, what checks are performed, and what the system cannot determine.
+          <p className="text-base text-slate-400 font-normal leading-relaxed">
+            Every analysis runs locally in your browser sandbox. Here is the step-by-step process that turns an image into an actionable verification finding.
           </p>
         </div>
 
-        {/* 4-Step Plain Language Flow */}
-        <div className="vg-card p-6 sm:p-8 bg-white border border-[#E2E7EF] mb-8 shadow-sm">
-          <h2 className="text-lg font-bold text-[#172033] mb-6">
-            The Inspection Steps
-          </h2>
-
-          <div className="space-y-6">
-            {/* Step 1 */}
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-full bg-[#EEF2F6] text-[#315EFB] text-xs font-bold font-mono flex items-center justify-center shrink-0">
-                01
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-[#172033] mb-1">
-                  Local image loading
-                </h3>
-                <p className="text-sm text-[#586579] leading-relaxed">
-                  When you select an image, your browser decodes the file into temporary memory. No image data or personal details are uploaded to a remote server.
-                </p>
-              </div>
+        {/* 3 Human-Crafted Stages */}
+        <div className="space-y-10">
+          
+          {/* Stage 1 */}
+          <div className="p-8 rounded-2xl bg-[#121624] border border-slate-800">
+            <div className="flex items-center gap-2.5 mb-3">
+              <span className="text-xs font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/25 px-2.5 py-0.5 rounded">
+                Step 01
+              </span>
+              <span className="text-xs font-medium text-slate-400">
+                Text Extraction &amp; Government Checksums
+              </span>
             </div>
 
-            {/* Step 2 */}
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-full bg-[#EEF2F6] text-[#315EFB] text-xs font-bold font-mono flex items-center justify-center shrink-0">
-                02
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-[#172033] mb-1">
-                  Image quality and blur check
-                </h3>
-                <p className="text-sm text-[#586579] leading-relaxed">
-                  The software measures edge contrast (Laplacian variance) across the image. An image with low contrast or heavy blur is flagged because blur makes visual editing harder to identify.
-                </p>
-              </div>
-            </div>
+            <h2 className="text-xl font-bold text-white mb-2">
+              Optical Character Recognition &amp; Syntax Verification
+            </h2>
+            <p className="text-slate-300 text-sm leading-relaxed mb-6 font-normal">
+              When a document is selected, the browser decodes it in client memory. Local Tesseract.js neural OCR extracts names, dates of birth, and identity numbers. The system verifies these values against standard algorithmic rules — including the Verhoeff Dihedral checksum for Indian Aadhaar and PAN entity syntax.
+            </p>
 
-            {/* Step 3 */}
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-full bg-[#EEF2F6] text-[#315EFB] text-xs font-bold font-mono flex items-center justify-center shrink-0">
-                03
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-[#172033] mb-1">
-                  Compression difference screening (Error Level Analysis)
-                </h3>
-                <p className="text-sm text-[#586579] leading-relaxed">
-                  When someone edits a JPEG image (such as modifying numbers or pasting a new portrait), the modified area often recompresses at a different rate than the background. The software divides the image into 16x16 blocks to detect these differences.
-                </p>
-              </div>
-            </div>
-
-            {/* Step 4 */}
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-full bg-[#EEF2F6] text-[#315EFB] text-xs font-bold font-mono flex items-center justify-center shrink-0">
-                04
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-[#172033] mb-1">
-                  Metadata and editing signatures
-                </h3>
-                <p className="text-sm text-[#586579] leading-relaxed">
-                  The image file header is scanned to see if it carries signatures from digital image editors like Photoshop, GIMP, or Canva, rather than standard camera hardware tags.
-                </p>
+            <div className="p-4 rounded-xl bg-[#0b0e14] border border-slate-800/80">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                Parsed Identity Fields:
+              </span>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {[
+                  'Full Name & Title',
+                  'Document Identification Number',
+                  'Date of Birth & Age Plausibility',
+                  'Issuing Authority Format',
+                  'Algorithmic Checksum (Verhoeff / PAN)'
+                ].map((item) => (
+                  <span key={item} className="px-2.5 py-1 rounded-md bg-indigo-950/40 text-indigo-200 border border-indigo-500/30">
+                    {item}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Neural Network Model Information */}
-        <div className="vg-card p-6 sm:p-8 bg-white border border-[#E2E7EF] mb-8 shadow-sm">
-          <h2 className="text-lg font-bold text-[#172033] mb-2">
-            The In-Browser Neural Network
-          </h2>
-          <p className="text-sm text-[#586579] leading-relaxed mb-4">
-            DocuGuard includes a compact convolutional neural network running directly in your browser via TensorFlow.js.
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm text-[#586579]">
-            <div className="p-3.5 rounded-lg bg-[#F7F8FA] border border-[#E2E7EF]">
-              <span className="font-semibold text-[#172033] block mb-1">Model Size &amp; Training:</span>
-              <p>1,032,005 parameters (4.13 MB). Trained on 2,374 forensic document images from the IMD2020 and AIForge datasets.</p>
+          {/* Stage 2 */}
+          <div className="p-8 rounded-2xl bg-[#121624] border border-slate-800">
+            <div className="flex items-center gap-2.5 mb-3">
+              <span className="text-xs font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/25 px-2.5 py-0.5 rounded">
+                Step 02
+              </span>
+              <span className="text-xs font-medium text-slate-400">
+                Physical Print &amp; Compression Forensics
+              </span>
             </div>
-            <div className="p-3.5 rounded-lg bg-[#F7F8FA] border border-[#E2E7EF]">
-              <span className="font-semibold text-[#172033] block mb-1">Tested Accuracy:</span>
-              <p>Achieved 66.45% validation accuracy on test splits. Real-world performance on novel layouts may vary.</p>
+
+            <h2 className="text-xl font-bold text-white mb-2">
+              Substrate Texture &amp; Image Splice Detection
+            </h2>
+            <p className="text-slate-300 text-sm leading-relaxed mb-6 font-normal">
+              Forgers often photograph computer screens or edit digital photos. The inspection engine checks physical image characteristics to detect unnatural interference.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-4 rounded-xl bg-[#0b0e14] border border-slate-800/80">
+                <span className="text-indigo-300 font-semibold block mb-1">Moiré &amp; Screen Analysis</span>
+                <span className="text-slate-400 leading-relaxed">
+                  Identifies sub-pixel interference grids caused when a camera takes a photo of an electronic LCD or OLED monitor.
+                </span>
+              </div>
+              <div className="p-4 rounded-xl bg-[#0b0e14] border border-slate-800/80">
+                <span className="text-indigo-300 font-semibold block mb-1">JPEG Quantization Continuity</span>
+                <span className="text-slate-400 leading-relaxed">
+                  Error Level Analysis looks for localized differences in compression tables where names, dates, or portraits were pasted.
+                </span>
+              </div>
+              <div className="p-4 rounded-xl bg-[#0b0e14] border border-slate-800/80">
+                <span className="text-indigo-300 font-semibold block mb-1">EXIF &amp; Binary Tags</span>
+                <span className="text-slate-400 leading-relaxed">
+                  Scans image segments for digital editing signatures from desktop photo editing suites like Adobe Photoshop or GIMP.
+                </span>
+              </div>
+              <div className="p-4 rounded-xl bg-[#0b0e14] border border-slate-800/80">
+                <span className="text-indigo-300 font-semibold block mb-1">Boundary Step Gradient</span>
+                <span className="text-slate-400 leading-relaxed">
+                  Measures edge sharpness around the portrait photo frame to verify smooth optical focus instead of harsh digital cutouts.
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Clear Limitations Disclosure */}
-        <div className="vg-card p-6 sm:p-8 bg-white border border-[#E2E7EF] shadow-sm">
-          <h2 className="text-lg font-bold text-[#172033] mb-2">
-            Important Limitations
-          </h2>
-          <ul className="space-y-2 text-sm text-[#586579] list-disc list-inside">
-            <li>DocuGuard cannot verify whether a name or identification number is authentic in government records.</li>
-            <li>Repeatedly sharing an image through messaging apps (WhatsApp, Telegram) can reduce compression signals.</li>
-            <li>This software is a screening aid for human reviewers, not an official certificate of authenticity.</li>
-          </ul>
+          {/* Stage 3 */}
+          <div className="p-8 rounded-2xl bg-[#121624] border border-slate-800">
+            <div className="flex items-center gap-2.5 mb-3">
+              <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-0.5 rounded">
+                Step 03
+              </span>
+              <span className="text-xs font-medium text-slate-400">
+                Analyst Learning &amp; Document Memory
+              </span>
+            </div>
 
-          <div className="mt-6 pt-4 border-t border-[#E2E7EF]">
-            <button 
-              onClick={() => onNavigate('verify')}
-              className="vg-btn-primary text-sm py-2 px-5"
-            >
-              Check a document image
-            </button>
+            <h2 className="text-xl font-bold text-white mb-2">
+              Continuous Learning &amp; Instant Document Memory
+            </h2>
+            <p className="text-slate-300 text-sm leading-relaxed mb-6 font-normal">
+              When an analyst confirms a document as genuine or altered, the system registers its SHA-256 fingerprint into local memory. If the exact same document is ever uploaded again, the verified analyst decision is recognized immediately with full confidence.
+            </p>
+
+            <div className="p-5 rounded-xl bg-[#0b0e14] border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-white text-sm font-semibold block">
+                  Experience Document Verification
+                </span>
+                <span className="text-xs text-slate-400">
+                  Try inspecting a sample document or upload your own file.
+                </span>
+              </div>
+
+              <button
+                onClick={() => onNavigate('verify')}
+                className="btn-primary text-xs py-2 px-4 cursor-pointer shrink-0"
+              >
+                Inspect a Document
+              </button>
+            </div>
           </div>
         </div>
       </div>

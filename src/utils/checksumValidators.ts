@@ -26,6 +26,18 @@ const p: number[][] = [
   [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
 ];
 
+const inv: number[] = [0, 4, 3, 2, 1, 5, 6, 7, 8, 9];
+
+export function generateVerhoeffCheckDigit(numStr: string): number {
+  const clean = numStr.replace(/\s+/g, '');
+  let c = 0;
+  const reversed = clean.split('').reverse().map(Number);
+  for (let i = 0; i < reversed.length; i++) {
+    c = d[c][p[(i + 1) % 8][reversed[i]]];
+  }
+  return inv[c];
+}
+
 export function validateVerhoeff(numStr: string): boolean {
   const clean = numStr.replace(/\s+/g, '');
   if (!/^\d{12}$/.test(clean)) return false;
