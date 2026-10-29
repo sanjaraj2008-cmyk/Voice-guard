@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Navbar, ActivePage } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { HomePage } from './pages/HomePage';
-import { VerifyPage } from './pages/VerifyPage';
-import { HowItWorksPage } from './pages/HowItWorksPage';
-import { SecurityPage } from './pages/SecurityPage';
-import { InsightsPage } from './pages/InsightsPage';
-import { SettingsPage } from './pages/SettingsPage';
+
+const VerifyPage = lazy(() => import('./pages/VerifyPage').then(m => ({ default: m.VerifyPage })));
+const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage').then(m => ({ default: m.HowItWorksPage })));
+const SecurityPage = lazy(() => import('./pages/SecurityPage').then(m => ({ default: m.SecurityPage })));
+const InsightsPage = lazy(() => import('./pages/InsightsPage').then(m => ({ default: m.InsightsPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<ActivePage>('home');
@@ -38,12 +39,26 @@ export default function App() {
 
       {/* Main Routed Page Content */}
       <div className="flex-1 flex flex-col">
-        {currentPage === 'home' && <HomePage onNavigate={handleNavigate} />}
-        {currentPage === 'verify' && <VerifyPage />}
-        {currentPage === 'how-it-works' && <HowItWorksPage onNavigate={handleNavigate} />}
-        {currentPage === 'security' && <SecurityPage onNavigate={handleNavigate} />}
-        {currentPage === 'insights' && <InsightsPage onNavigate={handleNavigate} />}
-        {currentPage === 'settings' && <SettingsPage />}
+        {currentPage === 'home' ? (
+          <HomePage onNavigate={handleNavigate} />
+        ) : (
+          <Suspense
+            fallback={
+              <div className="flex-1 flex items-center justify-center py-24 text-slate-400 text-xs font-medium">
+                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#121624] border border-slate-800">
+                  <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                  <span>Loading workspace...</span>
+                </div>
+              </div>
+            }
+          >
+            {currentPage === 'verify' && <VerifyPage />}
+            {currentPage === 'how-it-works' && <HowItWorksPage onNavigate={handleNavigate} />}
+            {currentPage === 'security' && <SecurityPage onNavigate={handleNavigate} />}
+            {currentPage === 'insights' && <InsightsPage onNavigate={handleNavigate} />}
+            {currentPage === 'settings' && <SettingsPage />}
+          </Suspense>
+        )}
       </div>
 
       {/* Global Footer */}
@@ -51,3 +66,4 @@ export default function App() {
     </div>
   );
 }
+

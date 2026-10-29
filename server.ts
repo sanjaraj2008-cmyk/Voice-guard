@@ -188,7 +188,12 @@ async function startServer() {
         middlewareMode: true,
         port: 3000,
         host: '0.0.0.0',
-        hmr: process.env.DISABLE_HMR !== 'true'
+        hmr: process.env.DISABLE_HMR !== 'true',
+        watch: process.env.DISABLE_HMR === 'true'
+          ? null
+          : {
+              ignored: ['**/dataset/**', '**/trained_model/**', '**/public/ai-model/**', '**/dist/**']
+            }
       },
       appType: 'spa'
     });
