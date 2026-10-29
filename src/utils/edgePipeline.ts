@@ -9,7 +9,7 @@ import {
 } from '../types/edge';
 import { analyzeImagePixelForensics } from './pixelForensics';
 import { validateVerhoeff, validatePanCard, validateDateOfBirth } from './checksumValidators';
-import { docuGuardAI, AIModelPrediction } from './aiModel';
+import type { AIModelPrediction } from './aiModel';
 import { rlPolicyAgent, GroundTruthAction } from './rlEngine';
 import {
   extractDocumentIdentityOCR,
@@ -690,6 +690,7 @@ export async function runEdgeVerificationPipeline(
   // In-browser DocuGuard Forensic CNN Inference (v1.2.0 trained model)
   let aiModelPred: AIModelPrediction | null = null;
   try {
+    const { docuGuardAI } = await import('./aiModel');
     aiModelPred = await docuGuardAI.predict(img);
   } catch (err) {
     console.warn('[DocuGuard AI] Local CNN prediction notice:', err);

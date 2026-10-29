@@ -13,7 +13,7 @@ import {
   reScanDocumentOCR,
   updateDocumentOCRFields
 } from '../utils/edgePipeline';
-import { generateAndDownloadDossierPdf, PdfExportOptions } from '../utils/pdfDossier';
+import type { PdfExportOptions } from '../utils/pdfDossier';
 import { rlPolicyAgent, GroundTruthAction } from '../utils/rlEngine';
 
 export const VerifyPage: React.FC = () => {
@@ -195,6 +195,7 @@ export const VerifyPage: React.FC = () => {
     if (!data) return;
     setIsDownloadingPdf(true);
     try {
+      const { generateAndDownloadDossierPdf } = await import('../utils/pdfDossier');
       await generateAndDownloadDossierPdf(data, pdfExportOptions);
       setIsExportModalOpen(false);
       setDownloadSuccessToast(true);

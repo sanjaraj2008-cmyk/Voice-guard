@@ -13,7 +13,9 @@ export async function runAiForensicAudit(
   riskAssessment: string;
   legalRiskNotes: string;
 }> {
-  const apiKey = process.env.GEMINI_API_KEY || (import.meta as unknown as { env: Record<string, string> }).env?.VITE_GEMINI_API_KEY;
+  const apiKey =
+    (typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY : undefined) ||
+    (import.meta as unknown as { env: Record<string, string> }).env?.VITE_GEMINI_API_KEY;
 
   if (apiKey) {
     try {
