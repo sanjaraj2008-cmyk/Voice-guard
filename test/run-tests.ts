@@ -460,6 +460,166 @@ rlPolicyAgent.clearMemory();
 assert(rlPolicyAgent.lookupDocumentMemory(testHashReal) === null, 'clearMemory cleanly wipes cached hashes');
 assert(rlPolicyAgent.getAllRememberedDocuments().length === 0, 'Memory list is empty after clearMemory');
 
+// ----------------------------------------------------------------------
+// SUITE 11: OCR Rectification — Confusion Recovery, PDF Stream & Hybrid Fusion
+// ----------------------------------------------------------------------
+console.log('\x1b[36m[SUITE 11] OCR Rectification — Confusion Recovery, PDF Stream & Hybrid Fusion\x1b[0m');
+
+import { extractRawPdfTextFromBuffer } from '../src/utils/ocrEngine';
+import { mergeHybridOCRFields, updateDocumentOCRFields } from '../src/utils/edgePipeline';
+
+// 11.1: OCR Character Confusion Recovery (O->0, I->1, S->5 in numeric IDs and Dates)
+const noisyOcrText = `
+Government of India
+Vikramaditya Sharma
+DOB: 14/O8/1992
+FEMALE
+8492 1O49 392I
+`;
+const parsedNoisy = parseUniversalIdentityEntities(noisyOcrText, 'noisy_scan.png');
+assert(parsedNoisy.fields.documentId === '8492 1049 3921', 'Recovers 12-digit Aadhaar ID when O/I are misread inside numeric blocks');
+assert(parsedNoisy.fields.dateOfBirth === '14/08/1992', 'Recovers DD/MM/YYYY date when 0 is misread as O');
+assert(parsedNoisy.fields.fullName === 'Vikramaditya Sharma', 'Extracts holder full name preceding DOB line');
+assert(parsedNoisy.fields.gender === 'Female', 'Extracts gender accurately');
+
+// 11.2: Native PDF Text Stream Extraction
+const syntheticPdfContent = `%PDF-1.4
+1 0 obj << /Type /Page >>
+stream
+BT
+/F1 12 Tf
+72 712 Td
+(Government of India) Tj
+(Name: Ananya Deshmukh) Tj
+(DOB: 21/11/1996) Tj
+(Gender: Female) Tj
+(6543 2109 8765) Tj
+ET
+endstream
+endobj
+%%EOF`;
+const pdfBuffer = new TextEncoder().encode(syntheticPdfContent).buffer;
+const extractedPdfText = extractRawPdfTextFromBuffer(pdfBuffer);
+assert(extractedPdfText.includes('Ananya Deshmukh'), 'Extracts holder name from native PDF BT/ET text stream');
+assert(extractedPdfText.includes('6543 2109 8765'), 'Extracts 12-digit ID from native PDF BT/ET text stream');
+const parsedFromPdf = parseUniversalIdentityEntities(extractedPdfText, 'e_aadhaar.pdf');
+assert(parsedFromPdf.fields.fullName === 'Ananya Deshmukh', 'Parses fullName from extracted PDF stream text');
+assert(parsedFromPdf.fields.documentId === '6543 2109 8765', 'Parses documentId from extracted PDF stream text');
+
+// 11.3: Hybrid Field-Level OCR Fusion & Placeholder Rejection
+const mergedHybrid = mergeHybridOCRFields(
+  { fullName: 'PDF DOCUMENT INSPECTION', documentId: '', dateOfBirth: '19/05/1994', documentType: 'Identity Document' },
+  { fullName: 'Rohan Kulkarni', documentId: 'ABCDE1234F', gender: 'Male' },
+  'Address: 42 MG Road, Pune - 411001',
+  'pan_card.pdf'
+);
+assert(mergedHybrid.fullName === 'Rohan Kulkarni', 'Rejects placeholder "PDF DOCUMENT INSPECTION" and selects real local OCR name');
+assert(mergedHybrid.documentId === 'ABCDE1234F', 'Backfills missing AI documentId from local Tesseract OCR');
+assert(mergedHybrid.dateOfBirth === '19/05/1994', 'Retains valid AI-extracted dateOfBirth');
+assert(mergedHybrid.address?.includes('411001') === true, 'Backfills address from combined raw text regex parser');
+assert(mergedHybrid.documentType === 'Permanent Account Number (PAN)', 'Upgrades generic documentType to specific PAN type');
+
+// 11.4: Interactive OCR Field Update & Automatic Checksum Re-Verification
+const baseDossier: any = {
+  documentId: 'DOC-OCR-TEST',
+  fileName: 'user_upload.png',
+  score: 88,
+  verdict: 'NO_SIGNIFICANT_MANIPULATION',
+  sensitivityThreshold: 78,
+  qualityCheck: { blurScore: 0.9, brightnessOk: true, passed: true },
+  ocr: {
+    confidence: 0.85,
+    fields: { fullName: 'Test User', documentId: '1234 5678 9012' },
+    rawText: 'Test User 1234 5678 9012',
+    diagnostics: []
+  },
+  evidence: [
+    { category: 'ocr', weight: 20, observation: 'Initial check', explanation: 'Initial', severity: 'pass', confidence: 0.9 }
+  ],
+  rlCalibration: {
+    action: 0,
+    verdict: 'NO_SIGNIFICANT_MANIPULATION',
+    probabilities: [0.8, 0.15, 0.05],
+    featureVector: [0.75, 0.2, 0.05, 0.05, 0.05, 1.0, 1.0],
+    noisePenaltyMultiplier: 1,
+    calibratedScore: 88
+  }
+};
+
+const updatedValidPanDossier = updateDocumentOCRFields(baseDossier, {
+  fullName: 'Test User',
+  documentId: 'ABCPD1234F',
+  dateOfBirth: '10/10/1990'
+});
+const ocrEv = updatedValidPanDossier.evidence.find((e: any) => e.category === 'ocr');
+assert(ocrEv?.severity === 'pass' && ocrEv.observation.includes('Valid PAN Card format'), 'updateDocumentOCRFields re-validates PAN card syntax and updates evidence');
+
+// ----------------------------------------------------------------------
+// SUITE 12: Algorithmic Audit — RL Clamping, Blended Scoring & Preset Resolution
+// ----------------------------------------------------------------------
+console.log('\x1b[36m[SUITE 12] Algorithmic Audit — RL Clamping, Blended Scoring & Preset Resolution\x1b[0m');
+
+import { computeBlendedForensicScore, findSamplePresetById } from '../src/utils/edgePipeline';
+
+// 12.1: Preset ID alias resolution ('clean', 'suspicious', 'tampered')
+assert(findSamplePresetById('clean')?.id === 'clean-id', 'Resolves short preset ID "clean" to "clean-id"');
+assert(findSamplePresetById('suspicious')?.id === 'suspicious-id', 'Resolves short preset ID "suspicious" to "suspicious-id"');
+assert(findSamplePresetById('tampered')?.id === 'forged-id', 'Resolves short preset ID "tampered" to "forged-id"');
+
+// 12.2: Complete PAN 4th-character entity mapping (L and J) & strict DOB calendar check
+const localAuthPan = validatePanCard('AAALA1234F');
+assert(localAuthPan.isValid && localAuthPan.entityType === 'Local Authority', 'PAN 4th letter L maps to Local Authority');
+const juridicalPan = validatePanCard('AAAJA1234F');
+assert(juridicalPan.isValid && juridicalPan.entityType === 'Artificial Juridical Person', 'PAN 4th letter J maps to Artificial Juridical Person');
+assert(!validateDateOfBirth('31/02/1995').isValid, 'Rejects non-existent rollover date 31/02/1995');
+
+// 12.3: Blended RL + Evidence Score Computation
+const cleanBlended = computeBlendedForensicScore(
+  92,
+  [{ category: 'texture', weight: 35, observation: 'Clean', explanation: 'OK', severity: 'pass', confidence: 0.95 }],
+  0.45
+);
+const failedBlended = computeBlendedForensicScore(
+  60,
+  [
+    { category: 'texture', weight: 35, observation: 'Moiré', explanation: 'Screen', severity: 'fail', confidence: 0.95 },
+    { category: 'ocr', weight: 20, observation: 'Bad ID', explanation: 'Fail', severity: 'fail', confidence: 0.95 }
+  ],
+  0.45
+);
+assert(cleanBlended > failedBlended && failedBlended < 60, 'computeBlendedForensicScore penalizes failed forensic evidence proportionally');
+
+// 12.4: Live OCR Checksum Failure Dynamically Lowers Score & Verdict
+const brokenChecksumDossier = updateDocumentOCRFields(baseDossier, {
+  fullName: 'Test User',
+  documentId: '8492 1049 3920', // Invalid Verhoeff last digit
+  dateOfBirth: '10/10/1990'
+});
+assert(
+  brokenChecksumDossier.score < updatedValidPanDossier.score,
+  `Invalid Verhoeff checksum dynamically lowers dossier score (${brokenChecksumDossier.score} < ${updatedValidPanDossier.score})`
+);
+assert(
+  brokenChecksumDossier.verdict !== 'NO_SIGNIFICANT_MANIPULATION',
+  'Invalid Verhoeff checksum prevents NO_SIGNIFICANT_MANIPULATION verdict'
+);
+
+// 12.5: RL Weight Clamping & NaN Sanitization under Repeated Updates
+rlPolicyAgent.resetToFactory();
+for (let i = 0; i < 40; i++) {
+  rlPolicyAgent.learnFromFeedback([1, 0, 0, 0, 0, 1, 1], 0, 0, `stress_${i}.png`);
+}
+const clampedStats = rlPolicyAgent.getStats();
+const allWeightsBounded = clampedStats.weights.every(row =>
+  row.every(w => Number.isFinite(w) && w >= -8.0 && w <= 8.0)
+);
+const allBiasesBounded = clampedStats.biases.every(b => Number.isFinite(b) && b >= -4.0 && b <= 4.0);
+assert(allWeightsBounded && allBiasesBounded, 'RL weights and biases remain strictly bounded in [-8, 8] and [-4, 4] after 40 epochs');
+
+const nanProbs = rlPolicyAgent.getActionProbabilities([NaN, Infinity, -Infinity, 0.2, 0.1, 1, 1]);
+assert(nanProbs.every(p => Number.isFinite(p) && p >= 0 && p <= 1), 'getActionProbabilities sanitizes NaN/Infinity inputs without producing NaN');
+rlPolicyAgent.resetToFactory();
+
 console.log('\n======================================================');
 console.log(`TEST SUMMARY: ${passedTests}/${totalTests} PASSED (${failedTests} FAILED)`);
 console.log('======================================================\n');

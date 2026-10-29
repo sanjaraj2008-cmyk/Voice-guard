@@ -71,6 +71,8 @@ export function validatePanCard(panStr: string): { isValid: boolean; entityType?
     A: 'Association of Persons',
     T: 'Trust',
     B: 'Body of Individuals',
+    L: 'Local Authority',
+    J: 'Artificial Juridical Person',
     G: 'Government Entity'
   };
 
@@ -81,14 +83,28 @@ export function validatePanCard(panStr: string): { isValid: boolean; entityType?
 }
 
 /**
- * Checks Date of Birth plausibility
+ * Checks Date of Birth plausibility and strict calendar validity
  */
 export function validateDateOfBirth(dobStr: string): { isValid: boolean; age?: number; error?: string } {
   // Support DD/MM/YYYY or YYYY-MM-DD
   let date: Date | null = null;
-  const dmyMatch = dobStr.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  const dmyMatch = dobStr.trim().match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
   if (dmyMatch) {
-    date = new Date(Number(dmyMatch[3]), Number(dmyMatch[2]) - 1, Number(dmyMatch[1]));
+    const day = Number(dmyMatch[1]);
+    const month = Number(dmyMatch[2]);
+    const year = Number(dmyMatch[3]);
+    if (month < 1 || month > 12 || day < 1 || day > 31) {
+      return { isValid: false, error: 'Invalid calendar day or month' };
+    }
+    date = new Date(year, month - 1, day);
+    // Guard against JS Date rollover (e.g. 31/02/1995 -> March 3)
+    if (
+      date.getFullYear() !== year ||
+      date.getMonth() !== month - 1 ||
+      date.getDate() !== day
+    ) {
+      return { isValid: false, error: 'Non-existent calendar date' };
+    }
   } else {
     date = new Date(dobStr);
   }

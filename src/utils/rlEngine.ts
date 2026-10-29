@@ -140,15 +140,21 @@ export class RLPolicyAgent {
   }
 
   /**
-   * Computes softmax action probability distribution π(a | s)
+   * Computes softmax action probability distribution π(a | s) with numerical sanitization
    */
   public getActionProbabilities(features: number[]): [number, number, number] {
     const logits: number[] = [0, 0, 0];
 
     for (let i = 0; i < 3; i++) {
-      let sum = this.biases[i];
+      const biasVal = Number.isFinite(this.biases[i]) ? this.biases[i] : FACTORY_BIASES[i];
+      let sum = biasVal;
       for (let j = 0; j < 7; j++) {
-        sum += this.weights[i][j] * (features[j] ?? 0);
+        const rawFeat = features[j];
+        const safeFeat = typeof rawFeat === 'number' && Number.isFinite(rawFeat)
+          ? Math.max(0, Math.min(1, rawFeat))
+          : 0;
+        const w = Number.isFinite(this.weights[i]?.[j]) ? this.weights[i][j] : FACTORY_WEIGHTS[i][j];
+        sum += w * safeFeat;
       }
       logits[i] = sum;
     }
@@ -156,7 +162,7 @@ export class RLPolicyAgent {
     // Stable softmax
     const maxLogit = Math.max(...logits);
     const exps = logits.map(l => Math.exp(l - maxLogit));
-    const sumExps = exps.reduce((acc, val) => acc + val, 0);
+    const sumExps = exps.reduce((acc, val) => acc + val, 0) || 1;
 
     return [
       exps[0] / sumExps,
@@ -166,11 +172,10 @@ export class RLPolicyAgent {
   }
 
   /**
-   * Predicts the most likely calibrated verdict and confidence
-   */
-  /**
    * Predicts the most likely calibrated verdict and confidence.
-   * If a document hash matches prior human feedback in memory, returns the verified label immediately.
+   * When a document hash matches prior human feedback in memory, blends the verified memory prior
+   * with live policy probabilities and active OCR checksum integrity so analyst OCR edits or
+   * strictness adjustments remain responsive.
    */
   public predictVerdict(
     features: number[], 
@@ -185,21 +190,52 @@ export class RLPolicyAgent {
     isMemoryMatch?: boolean;
     memoryEntry?: DocumentFeedbackMemory;
   } {
-    // 1. Direct Cryptographic Memory Match (Instant verified label)
+    const liveProbs = this.getActionProbabilities(features);
+    const hasHardOcrChecksumFail = (features[5] ?? 1) === 0;
+
+    // 1. Cryptographic Memory Match blended with live policy & OCR checksum verification
     if (sha256) {
       const memoryMatch = this.lookupDocumentMemory(sha256);
       if (memoryMatch) {
-        const probs: [number, number, number] = memoryMatch.groundTruth === 0
+        const memoryPrior: [number, number, number] = memoryMatch.groundTruth === 0
           ? [0.96, 0.03, 0.01]
           : memoryMatch.groundTruth === 1
           ? [0.05, 0.90, 0.05]
           : [0.01, 0.04, 0.95];
 
+        // Blend 80% verified memory prior with 20% live policy distribution
+        const blendedProbs: [number, number, number] = [
+          memoryPrior[0] * 0.80 + liveProbs[0] * 0.20,
+          memoryPrior[1] * 0.80 + liveProbs[1] * 0.20,
+          memoryPrior[2] * 0.80 + liveProbs[2] * 0.20
+        ];
+        const bSum = blendedProbs[0] + blendedProbs[1] + blendedProbs[2] || 1;
+        const normMemoryProbs: [number, number, number] = [
+          blendedProbs[0] / bSum,
+          blendedProbs[1] / bSum,
+          blendedProbs[2] / bSum
+        ];
+
+        // If an analyst manually edited OCR into a hard checksum failure on an otherwise authentic memory doc,
+        // apply a proportional penalty while preserving the memory match record
+        if (hasHardOcrChecksumFail && memoryMatch.groundTruth === 0) {
+          const penalizedScore = Math.max(48, memoryMatch.score - 28);
+          return {
+            action: 1,
+            verdict: 'POSSIBLE_MANIPULATION',
+            probabilities: [0.35, 0.50, 0.15],
+            confidence: 0.85,
+            calibratedScore: penalizedScore,
+            isMemoryMatch: true,
+            memoryEntry: memoryMatch
+          };
+        }
+
         return {
           action: memoryMatch.groundTruth,
           verdict: memoryMatch.verdict,
-          probabilities: probs,
-          confidence: 0.99,
+          probabilities: normMemoryProbs,
+          confidence: Math.max(0.95, ...normMemoryProbs),
           calibratedScore: memoryMatch.score,
           isMemoryMatch: true,
           memoryEntry: memoryMatch
@@ -207,16 +243,14 @@ export class RLPolicyAgent {
       }
     }
 
-    const probs = this.getActionProbabilities(features);
-
     // Apply sensitivity offset (shifting bias towards authentic if sensitivity is relaxed)
     const adjustedProbs: [number, number, number] = [
-      Math.max(0.01, probs[0] - sensitivityOffset),
-      Math.max(0.01, probs[1] + sensitivityOffset * 0.5),
-      Math.max(0.01, probs[2] + sensitivityOffset * 0.5)
+      Math.max(0.01, liveProbs[0] - sensitivityOffset),
+      Math.max(0.01, liveProbs[1] + sensitivityOffset * 0.5),
+      Math.max(0.01, liveProbs[2] + sensitivityOffset * 0.5)
     ];
 
-    const total = adjustedProbs[0] + adjustedProbs[1] + adjustedProbs[2];
+    const total = adjustedProbs[0] + adjustedProbs[1] + adjustedProbs[2] || 1;
     const normProbs: [number, number, number] = [
       adjustedProbs[0] / total,
       adjustedProbs[1] / total,
@@ -251,7 +285,7 @@ export class RLPolicyAgent {
   }
 
   /**
-   * Delivers reward signal from user feedback, executes policy gradient update,
+   * Delivers reward signal from user feedback, executes regularized policy gradient update,
    * and persists the document's cryptographic SHA-256 fingerprint into verified memory.
    */
   public learnFromFeedback(
@@ -267,7 +301,6 @@ export class RLPolicyAgent {
     updatedProbabilities: [number, number, number];
     memoryEntry?: DocumentFeedbackMemory;
   } {
-    // If document SHA-256 is provided, record into verified memory immediately!
     let memoryEntry: DocumentFeedbackMemory | undefined;
     if (sha256) {
       memoryEntry = this.rememberDocument(sha256, targetGroundTruth, documentName);
@@ -302,34 +335,42 @@ export class RLPolicyAgent {
         reward = -2.0;
         explanation = 'Critical missed tamper forgery penalized (-2.0 penalty)';
       } else if (targetGroundTruth === 2 && predictedAction === 1) {
-        reward = 0.4;
-        explanation = 'Detected anomaly but missed definitive tamper (+0.4 reward)';
+        reward = -0.6;
+        explanation = 'Under-classified forgery corrected to Tampered (-0.6 penalty)';
       } else {
         reward = -0.8;
         explanation = 'Classification mismatch feedback recorded (-0.8 penalty)';
       }
     }
 
-    // Policy Gradient alignment step:
-    // Increases probability of targetGroundTruth, scaled by feedback reward magnitude.
-    // Negative rewards (penalties for false suspicion / missed forgery) produce higher correction weights.
+    // Policy Gradient alignment step with L2 weight regularization and bounds clamping
     const stepMagnitude = reward >= 0 ? Math.max(0.6, reward) : Math.abs(reward) * 1.5;
     let deltaNormSq = 0;
     const lr = LEARNING_RATE;
+    const weightDecay = 0.004;
 
     for (let k = 0; k < 3; k++) {
       const indicator = k === targetGroundTruth ? 1 : 0;
       const gradMultiplier = lr * stepMagnitude * (indicator - probs[k]);
 
-      // Update biases
-      this.biases[k] += gradMultiplier;
-      deltaNormSq += gradMultiplier * gradMultiplier;
+      // Update & clamp biases in [-4.0, 4.0]
+      const prevBias = this.biases[k];
+      this.biases[k] = Math.max(-4.0, Math.min(4.0, prevBias + gradMultiplier));
+      const actualBiasDelta = this.biases[k] - prevBias;
+      deltaNormSq += actualBiasDelta * actualBiasDelta;
 
-      // Update weights
+      // Update & clamp weights in [-8.0, 8.0] with gentle L2 pull toward factory prior
       for (let j = 0; j < 7; j++) {
-        const dW = gradMultiplier * (features[j] ?? 0);
-        this.weights[k][j] += dW;
-        deltaNormSq += dW * dW;
+        const safeFeat = typeof features[j] === 'number' && Number.isFinite(features[j])
+          ? Math.max(0, Math.min(1, features[j]))
+          : 0;
+        const priorW = FACTORY_WEIGHTS[k][j];
+        const l2Reg = -weightDecay * (this.weights[k][j] - priorW);
+        const dW = gradMultiplier * safeFeat + l2Reg;
+        const prevW = this.weights[k][j];
+        this.weights[k][j] = Math.max(-8.0, Math.min(8.0, prevW + dW));
+        const actualWDelta = this.weights[k][j] - prevW;
+        deltaNormSq += actualWDelta * actualWDelta;
       }
     }
 

@@ -1,103 +1,62 @@
-# Hero Headline Scroll-Up Vertical Text Carousel
+# Full Codebase, Forensic Algorithm & Reinforcement Learning Rectification Plan
 
-A lightweight, non-destructive animation enhancement that adds a smooth scroll-up vertical carousel to the primary Hero headline, cycling through document types and verification capabilities while preserving 100% of the underlying forensics pipeline and source code.
+## 1. Executive Summary & Audit Findings
+A complete audit of the codebase, forensic algorithms, and Reinforcement Learning (`RLPolicyAgent`) revealed several concrete bugs and architectural dissimilarities:
 
-### User Review & Critical Decisions
-
-> [!IMPORTANT]
-> Based on your selections during interactive clarification, the scroll-up text effect will be implemented with the following specifications:
-
-- **Confirmed Decision 1 (Placement)**: Applied directly to the **Hero headline** in `src/pages/HomePage.tsx`. The fixed lead-in text anchors the statement, while the dynamic key phrase slides upward to reveal rotating aspects of the platform.
-- **Confirmed Decision 2 (Animation Style)**: **Smooth vertical carousel sliding up every 3 seconds**. Uses pure CSS transform/transition with an interval timer to glide the incoming text upward while gently scrolling the previous text out of view.
-- **Confirmed Decision 3 (Zero Source Code Damage Guarantee)**: Fully non-destructive. Modifies only the visual presentation wrapper of the headline in `src/pages/HomePage.tsx`. All 103 automated tests, ML policy engine (`rlEngine.ts`), edge verification pipeline (`edgePipeline.ts`), and OCR parsing (`ocrEngine.ts`) remain completely untouched.
-
----
-
-### 1. Overview & Core Concept
-
-- **What It Does**: Replaces static headline text with an engaging, smooth vertical slide-up text rotator that continuously showcases what DocuGuard verifies:
-  1. *"...against physical alterations."*
-  2. *"...with total on-device privacy."*
-  3. *"...across Aadhaar, PAN & Passports."*
-  4. *"...detecting screen re-photography."*
-  5. *"...with instant ground-truth memory."*
-- **Target Audience**: Compliance officers, verification analysts, and visitors landing on the homepage who immediately see the broad scope of documents and tamper checks supported.
-- **Key Value**: Adds human dynamic motion and visual polish to the hero fold without any heavy third-party animation dependencies or risk to existing functionality.
+1. **RL Score Freezing in `recomputeVerdictWithRL` (`src/utils/edgePipeline.ts`)**:
+   - `let finalScore = typeof currentData.score === 'number' ? currentData.score : rlPred.calibratedScore;` prevented the document's score from updating when RL policy weights changed, when the sensitivity slider was moved, or when OCR fields/checksums were edited (`updateDocumentOCRFields`), unless a hardcoded SHA-256 memory override occurred.
+2. **Unused Evidence Penalties & RL Noise Multiplier (`src/utils/edgePipeline.ts`)**:
+   - `runEdgeVerificationPipeline` computed `scorePenalties` using `rlPolicyAgent.getNoisePenaltyMultiplier()`, but then discarded `scorePenalties` and assigned `finalScore = rlPred.calibratedScore`.
+3. **RL Policy Gradient Stability & SHA-256 Memory Blending (`src/utils/rlEngine.ts`)**:
+   - `learnFromFeedback` lacked L2 weight decay and weight clamping (`[-8, 8]`), risking logit saturation on repeated confirmations, and assigned a positive reward (`+0.4`) when a tampered document (`targetGroundTruth = 2`) was misclassified as suspicious (`predictedAction = 1`).
+   - `predictVerdict` returned static probabilities (`[0.96, 0.03, 0.01]`) on a SHA-256 memory hit, completely ignoring live OCR/checksum edits (`features[5]`) and sensitivity adjustments.
+4. **Broken Sample Document Presets (`src/pages/VerifyPage.tsx` & `src/utils/edgePipeline.ts`)**:
+   - `VerifyPage.tsx` passed preset IDs `'clean'`, `'suspicious'`, and `'tampered'` to `handleLoadPreset`, while `SAMPLE_PRESETS` in `edgePipeline.ts` used `'clean-id'`, `'suspicious-id'`, and `'forged-id'`, causing sample buttons to fail silently.
+   - Filename matchers in `edgePipeline.ts` checked `suspicious_rephoto` and `forged_tampered`, which did not match `Suspicious_ID_Compression_Mismatch.png` or `Forged_Screen_Photo_Tampered.png`.
+5. **Validator & Cross-Page UI/UX Dissimilarities**:
+   - `validatePanCard` (`src/utils/checksumValidators.ts`) matched `L` and `J` in its regex but omitted `'L': 'Local Authority'` and `'J': 'Artificial Juridical Person'` from `typeMap`.
+   - `HomePage.tsx` and `VerifyPage.tsx` were missing the previously requested smooth vertical scroll-up hero text carousel and the PDF export settings modal (`Standard` vs. `Forensic Report` toggle) plus the collapsible OCR diagnostics/error log drawer.
+   - `InsightsPage.tsx`, `SecurityPage.tsx`, and `SettingsPage.tsx` used legacy light-theme classes (`bg-[#F7F8FA]`, `vg-card`) instead of the unified dark forensic theme (`#0b0e14` / `#121624`), and `SettingsPage.tsx` cleared `localStorage` without resetting the in-memory `rlPolicyAgent` singleton.
 
 ---
 
-### 2. User Experience & Visual Design
+## 2. Proposed Architecture & Code Changes
 
-#### Headline Visual Motion
+### A. Reinforcement Learning Engine (`src/utils/rlEngine.ts`)
+- **Mathematical Stability & Weight Regularization**:
+  - Add L2 weight regularization (`decay = 0.005`) and clamp weights to `[-8.0, 8.0]` and biases to `[-4.0, 4.0]` inside `learnFromFeedback` to prevent softmax saturation and `NaN`/`Infinity` drift.
+  - Ensure all features in `getActionProbabilities` are finite numbers bounded in `[0, 1]`.
+  - Fix reward assignment when `targetGroundTruth === 2 && predictedAction === 1` so partial detection of a tampered document applies a corrective gradient toward class `2` (`Tampered`) while recording an accurate reward signal.
+- **Memory Prior + Live Policy & OCR Blending (`predictVerdict`)**:
+  - When a document's SHA-256 is found in `memoryCache`, blend the remembered ground-truth distribution with the live policy softmax distribution (`getActionProbabilities(features)`) and apply a live penalty if the user subsequently edits OCR fields into an invalid checksum (`features[5] === 0`), while still respecting `isMemoryMatch: true` for intact remembered documents.
 
-```
-       ┌────────────────────────────────────────────────────────┐
-       │   Verify identity documents                            │
-       │  ┌──────────────────────────────────────────────────┐  │
-       │  │ ▲ [ ...with total on-device privacy.           ] │  │  (Slides up & fades in)
-       │  └──────────────────────────────────────────────────┘  │
-       │  (Masked container: overflow-hidden, smooth 400ms ease)│
-       └────────────────────────────────────────────────────────┘
-```
+### B. Edge Verification Pipeline & Score Synchronization (`src/utils/edgePipeline.ts`)
+- **Blended Score Computation (`computeBlendedForensicScore`)**:
+  - Create a shared helper used by both `runEdgeVerificationPipeline` and `recomputeVerdictWithRL` that blends the RL policy's `calibratedScore` (65% weight) with the evidence-based score `100 - scorePenalties` (35% weight, scaled by `rlPolicyAgent.getNoisePenaltyMultiplier()` and adjusted by `sensitivityOffset`).
+  - Ensure editing OCR fields (`updateDocumentOCRFields`), re-scanning OCR (`reScanDocumentOCR`), providing RL feedback, or sliding the strictness threshold immediately recalculates `finalScore`, `verdict`, `conceptEvaluation`, and `rlCalibration` in lockstep.
+- **Sample Preset ID & Filename Alignment**:
+  - Support both `'clean'` / `'clean-id'`, `'suspicious'` / `'suspicious-id'`, and `'tampered'` / `'forged-id'` in preset lookup and align `isCleanPreset`, `isSuspiciousPreset`, and `isForgedPreset` matchers with `SAMPLE_PRESETS` document names.
 
-- **Visual Details**:
-  - Container: Inline-block with `overflow-hidden` fixed height matching the line-height (`h-[1.25em]`).
-  - Active text: Soft indigo-accented gradient (`text-indigo-400 font-extrabold`).
-  - Motion: `translateY(0)` to `translateY(-100%)` for exiting text, and `translateY(100%)` to `translateY(0)` for entering text.
-  - Reduced Motion Respect: If the user has `prefers-reduced-motion` enabled in their OS, smoothly cross-fades opacity without vertical displacement.
+### C. Checksum & Chronology Validators (`src/utils/checksumValidators.ts`)
+- Add `'L': 'Local Authority'` and `'J': 'Artificial Juridical Person'` to `validatePanCard`'s `typeMap`.
+- Validate calendar day/month bounds strictly in `validateDateOfBirth` (rejecting invalid calendar rollovers like `31/02/1995`).
 
----
-
-### 3. Key Product Decisions & Trade-Offs
-
-- **Decision 1: Self-Contained React Hook Component vs. External Library**:
-  - *Chosen Approach*: Self-contained React state + CSS transition inside a dedicated micro-component or inline state in `src/pages/HomePage.tsx`.
-  - *Why*: Installing external animation packages (e.g. Framer Motion, GSAP) is unnecessary for a single carousel headline and risks bloat or bundle breakage. Native React + Tailwind delivers 60fps performance with zero new dependencies.
-
-- **Decision 2: Cycling Phrases Selection**:
-  - *Phrases*:
-    1. `"with total on-device privacy."`
-    2. `"against physical tampering."`
-    3. `"across Aadhaar, PAN & Passports."`
-    4. `"detecting screen re-photography."`
-    5. `"with instant verification memory."`
-  - *Why*: Directly reinforces the 5 core capabilities built into the applet without altering any layout geometry.
+### D. Unified UI Theme & Restored Features (`src/pages/*` & `src/utils/pdfDossier.ts`)
+- **`HomePage.tsx`**:
+  - Restore the smooth vertical scroll-up cycling headline carousel in the hero section (`with confidence and privacy.`, `with zero cloud exposure.`, `with instant pixel forensics.`, `with neural OCR precision.`).
+- **`VerifyPage.tsx` & `pdfDossier.ts`**:
+  - Fix sample preset buttons so clicking Genuine, Screen Re-photography, or Digitally Altered ID loads and runs the full verification pipeline.
+  - Restore the PDF Export Settings Modal allowing users to toggle between **Standard Summary** and **Forensic Report** (with optional SHA-256 provenance and raw OCR text inclusion) before downloading.
+  - Enhance the OCR Diagnostics & Error Log panel to clearly surface pass counts, engine status, and actionable troubleshooting reasons when recognition encounters low-contrast or degraded inputs.
+- **`InsightsPage.tsx`, `SecurityPage.tsx`, `SettingsPage.tsx`**:
+  - Unify styling with the dark forensic theme (`bg-[#0b0e14]`, `bg-[#121624]`, `border-slate-800`) and ensure "Clear session data" in `SettingsPage.tsx` also calls `rlPolicyAgent.resetToFactory()`.
 
 ---
 
-### 4. Technical Architecture & Implementation Steps
-
-#### Component Flow
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    HomePage Component Render                    │
-└────────────────────────────────┬────────────────────────────────┘
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              Hero Scroll-Up Headline Wrapper                     │
-│                                                                 │
-│   "Verify identity documents"                                   │
-│   ┌───────────────────────────────────────────────────────┐     │
-│   │ useEffect Interval (every 3000ms):                     │     │
-│   │   1. Trigger exit animation (slide up & fade)         │     │
-│   │   2. Increment index (cycle 0 -> 1 -> 2 -> ... -> 0)  │     │
-│   │   3. Trigger enter animation (slide up from bottom)   │     │
-│   └───────────────────────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-#### Step-by-Step Implementation:
-
-1. **Implement Scroll-Up Text Mechanism in `src/pages/HomePage.tsx`**:
-   - [x] Created `ScrollUpText` component cycling through 5 key phrases every 3.2 seconds.
-   - [x] Added `@keyframes scrollUpIn` and `@keyframes scrollUpOut` in `src/index.css` with cubic-bezier easing and `prefers-reduced-motion` compliance.
-2. **Verify Non-Interference**:
-   - [x] Confirmed zero damage to verification pipeline, reinforcement learning agent, OCR engine, or navigation.
-   - [x] Fixed-height container prevents layout jitter on mobile and desktop.
-3. **Automated Verification**:
-   - [x] `npm test`: 103/103 tests passing with 0 failures across all 10 suites.
-   - [x] `lint_applet` (`tsc --noEmit`): 0 TypeScript errors.
-   - [x] `compile_applet`: Build succeeded cleanly.
-   - [x] `restart_dev_server`: Dev server restarted.
+## 3. Verification & Testing Plan
+- Expand `test/run-tests.ts` to test:
+  - Blended RL + evidence penalty score calculation and live score updates in `recomputeVerdictWithRL` and `updateDocumentOCRFields`.
+  - RL weight clamping, L2 regularization, and memory-match + OCR checksum interaction.
+  - All 10 PAN entity types (`P, C, H, F, A, T, B, L, J, G`) and strict calendar date validation.
+  - Sample preset ID and filename resolution.
+- Run `npm test`, `lint_applet`, and `compile_applet` to verify zero errors and 100% passing tests.

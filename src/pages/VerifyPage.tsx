@@ -1,15 +1,19 @@
 import React, { useState, useRef } from 'react';
 import { 
   DocumentVerificationData, 
-  VerdictType 
+  VerdictType,
+  OCRFields
 } from '../types/edge';
 import { 
   SAMPLE_PRESETS, 
+  findSamplePresetById,
   runEdgeVerificationPipeline,
   getVerdictConfig,
-  recomputeVerdictWithRL
+  recomputeVerdictWithRL,
+  reScanDocumentOCR,
+  updateDocumentOCRFields
 } from '../utils/edgePipeline';
-import { generateAndDownloadDossierPdf } from '../utils/pdfDossier';
+import { generateAndDownloadDossierPdf, PdfExportOptions } from '../utils/pdfDossier';
 import { rlPolicyAgent, GroundTruthAction } from '../utils/rlEngine';
 
 export const VerifyPage: React.FC = () => {
@@ -21,11 +25,22 @@ export const VerifyPage: React.FC = () => {
   });
   const [activeViewMode, setActiveViewMode] = useState<'standard' | 'ocr' | 'forensic'>('standard');
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [pdfExportOptions, setPdfExportOptions] = useState<PdfExportOptions>({
+    format: 'forensic',
+    includeHashProvenance: true,
+    includeRawOcrText: true,
+    includeEvidenceBreakdown: true
+  });
   const [isHashCopied, setIsHashCopied] = useState<boolean>(false);
   const [downloadSuccessToast, setDownloadSuccessToast] = useState<boolean>(false);
   const [sensitivityThreshold, setSensitivityThreshold] = useState<number>(78);
   const [rlStats, setRlStats] = useState(() => rlPolicyAgent.getStats());
   const [feedbackToast, setFeedbackToast] = useState<{ reward: number; explanation: string } | null>(null);
+  const [isRescanningOcr, setIsRescanningOcr] = useState<boolean>(false);
+  const [isEditingOcr, setIsEditingOcr] = useState<boolean>(false);
+  const [editableOcrFields, setEditableOcrFields] = useState<OCRFields>({});
+  const [showOcrDiagnostics, setShowOcrDiagnostics] = useState<boolean>(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -99,12 +114,57 @@ export const VerifyPage: React.FC = () => {
         { sensitivityThreshold }
       );
       setData(result);
+      setEditableOcrFields(result.ocr.fields);
+      setIsEditingOcr(false);
       setRlStats(rlPolicyAgent.getStats());
     } catch (err) {
       console.error(err);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleRescanOcr = async () => {
+    if (!data || isRescanningOcr) return;
+    setIsRescanningOcr(true);
+    try {
+      const updated = await reScanDocumentOCR(data, 'high-contrast');
+      setData(updated);
+      setEditableOcrFields(updated.ocr.fields);
+      setFeedbackToast({
+        reward: 0,
+        explanation: 'Completed High-Contrast OCR re-scan and updated extracted identity fields.'
+      });
+      setTimeout(() => setFeedbackToast(null), 4000);
+    } catch (err) {
+      console.error('OCR re-scan error:', err);
+    } finally {
+      setIsRescanningOcr(false);
+    }
+  };
+
+  const handleSaveOcrEdits = () => {
+    if (!data) return;
+    const cleaned: OCRFields = {};
+    for (const [k, v] of Object.entries(editableOcrFields)) {
+      if (v && v.trim() !== '') {
+        cleaned[k] = v.trim();
+      }
+    }
+    const updated = updateDocumentOCRFields(
+      data,
+      cleaned,
+      undefined,
+      `${data.ocr.engineUsed || 'Hybrid OCR'} (Analyst Verified)`,
+      'Manual OCR field refinement applied; re-verified Verhoeff / PAN / Chronology rules.'
+    );
+    setData(updated);
+    setIsEditingOcr(false);
+    setFeedbackToast({
+      reward: 0,
+      explanation: 'Updated OCR fields and re-verified document ID checksums.'
+    });
+    setTimeout(() => setFeedbackToast(null), 4000);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,7 +175,7 @@ export const VerifyPage: React.FC = () => {
   };
 
   const handleLoadPreset = (presetId: string) => {
-    const preset = SAMPLE_PRESETS.find(p => p.id === presetId);
+    const preset = findSamplePresetById(presetId) || SAMPLE_PRESETS.find(p => p.id === presetId);
     if (!preset) return;
 
     const dataUrl = preset.generateImage();
@@ -126,11 +186,17 @@ export const VerifyPage: React.FC = () => {
       });
   };
 
-  const handleDownloadPdf = async () => {
+  const handleOpenExportModal = () => {
+    if (!data) return;
+    setIsExportModalOpen(true);
+  };
+
+  const handleConfirmDownloadPdf = async () => {
     if (!data) return;
     setIsDownloadingPdf(true);
     try {
-      await generateAndDownloadDossierPdf(data);
+      await generateAndDownloadDossierPdf(data, pdfExportOptions);
+      setIsExportModalOpen(false);
       setDownloadSuccessToast(true);
       setTimeout(() => setDownloadSuccessToast(false), 4500);
     } catch (err) {
@@ -329,7 +395,7 @@ export const VerifyPage: React.FC = () => {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleDownloadPdf}
+                  onClick={handleOpenExportModal}
                   disabled={isDownloadingPdf}
                   className="btn-primary text-xs py-2 px-3.5 cursor-pointer"
                 >
@@ -730,36 +796,151 @@ export const VerifyPage: React.FC = () => {
                 
                 {/* Extracted Identity Information */}
                 <div className="p-5 rounded-2xl bg-[#121624] border border-slate-800">
-                  <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/8">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-white">
-                      Extracted Document Details
-                    </h3>
-                    <span className="text-xs text-indigo-400 font-medium">
-                      {Object.keys(data.ocr.fields).length} Fields Parsed
-                    </span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-white/8">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                        Extracted Document Details
+                      </h3>
+                      <span className="text-[11px] text-slate-400 block mt-0.5">
+                        Engine: <strong className="text-indigo-300 font-medium">{data.ocr.engineUsed || 'Hybrid Vision + Tesseract WASM'}</strong>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleRescanOcr}
+                        disabled={isRescanningOcr}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 transition-colors cursor-pointer disabled:opacity-50"
+                        title="Re-run OCR with high-contrast adaptive thresholding"
+                      >
+                        {isRescanningOcr ? 'Scanning...' : 'Re-Scan OCR'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isEditingOcr) {
+                            setEditableOcrFields({
+                              fullName: data.ocr.fields.fullName || '',
+                              documentId: data.ocr.fields.documentId || '',
+                              dateOfBirth: data.ocr.fields.dateOfBirth || '',
+                              gender: data.ocr.fields.gender || '',
+                              address: data.ocr.fields.address || '',
+                              expiryDate: data.ocr.fields.expiryDate || '',
+                              documentType: data.ocr.fields.documentType || 'Identity Document'
+                            });
+                          }
+                          setIsEditingOcr(!isEditingOcr);
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+                      >
+                        {isEditingOcr ? 'Cancel' : 'Edit'}
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    {Object.entries(data.ocr.fields).map(([key, val]) => (
-                      <div key={key} className="flex justify-between items-center p-2.5 rounded-lg bg-[#0b0e14] border border-slate-800/80 text-xs">
-                        <span className="text-slate-400 capitalize font-medium">
-                          {key.replace(/([A-Z])/g, ' $1')}
-                        </span>
-                        <span className="text-slate-100 font-semibold text-right truncate max-w-[200px]">
-                          {val}
-                        </span>
+                  {isEditingOcr ? (
+                    <div className="space-y-2.5">
+                      {[
+                        { key: 'fullName', label: 'Full Name' },
+                        { key: 'documentId', label: 'Document ID' },
+                        { key: 'dateOfBirth', label: 'Date of Birth (DD/MM/YYYY)' },
+                        { key: 'gender', label: 'Gender' },
+                        { key: 'address', label: 'Address' },
+                        { key: 'expiryDate', label: 'Expiry Date' },
+                        { key: 'documentType', label: 'Document Type' }
+                      ].map(field => (
+                        <div key={field.key} className="flex flex-col gap-1">
+                          <label className="text-[10px] font-medium text-slate-400 uppercase">
+                            {field.label}
+                          </label>
+                          <input
+                            type="text"
+                            value={editableOcrFields[field.key] || ''}
+                            onChange={e =>
+                              setEditableOcrFields(prev => ({
+                                ...prev,
+                                [field.key]: e.target.value
+                              }))
+                            }
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-[#0b0e14] border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                      ))}
+                      <div className="pt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleSaveOcrEdits}
+                          className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors cursor-pointer"
+                        >
+                          Save &amp; Re-Verify Checksums
+                        </button>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {Object.entries(data.ocr.fields).map(([key, val]) => (
+                        <div key={key} className="flex justify-between items-center p-2.5 rounded-lg bg-[#0b0e14] border border-slate-800/80 text-xs gap-3">
+                          <span className="text-slate-400 capitalize font-medium shrink-0">
+                            {key.replace(/([A-Z])/g, ' $1')}
+                          </span>
+                          <span className="text-slate-100 font-semibold text-right truncate max-w-[220px]" title={val}>
+                            {val}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {data.ocr.rawText && (
                     <div className="mt-4 pt-3 border-t border-white/8">
                       <span className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
                         Raw Recognized Text:
                       </span>
-                      <pre className="text-[11px] font-mono text-slate-400 bg-[#0b0e14] p-3 rounded-lg border border-slate-800/80 whitespace-pre-wrap max-h-24 overflow-y-auto intel-scroll">
+                      <pre className="text-[11px] font-mono text-slate-300 bg-[#0b0e14] p-3 rounded-lg border border-slate-800/80 whitespace-pre-wrap max-h-28 overflow-y-auto intel-scroll">
                         {data.ocr.rawText}
                       </pre>
+                    </div>
+                  )}
+
+                  {data.ocr.diagnostics && data.ocr.diagnostics.length > 0 && (
+                    <div className="mt-3 pt-2.5 border-t border-white/8">
+                      <button
+                        type="button"
+                        onClick={() => setShowOcrDiagnostics(prev => !prev)}
+                        className="w-full flex items-center justify-between text-[10px] font-semibold text-slate-300 uppercase tracking-wider mb-1.5 cursor-pointer hover:text-white"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                          <span>OCR Engine Diagnostics &amp; Log ({data.ocr.diagnostics.length})</span>
+                        </span>
+                        <span className="text-indigo-400 text-[10px]">
+                          {showOcrDiagnostics ? 'Hide ▲' : 'Show ▼'}
+                        </span>
+                      </button>
+
+                      {showOcrDiagnostics && (
+                        <div className="p-2.5 rounded-lg bg-[#0b0e14] border border-slate-800/90 space-y-1.5">
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 pb-1 border-b border-slate-800/80">
+                            <span>Passes Executed: <strong className="text-slate-200">{data.ocr.passCount || 1}</strong></span>
+                            <span>Confidence: <strong className="text-indigo-300">{(data.ocr.confidence * 100).toFixed(0)}%</strong></span>
+                          </div>
+                          <ul className="space-y-1 text-[11px] text-slate-300 font-mono">
+                            {data.ocr.diagnostics.map((diag, i) => {
+                              const isWarnOrErr = /warning|error|fail|offline|low|fallback/i.test(diag);
+                              return (
+                                <li key={i} className="flex items-start gap-1.5 leading-snug">
+                                  <span className={isWarnOrErr ? 'text-amber-400 mt-0.5' : 'text-emerald-400 mt-0.5'}>
+                                    {isWarnOrErr ? '⚠' : '✓'}
+                                  </span>
+                                  <span className={isWarnOrErr ? 'text-amber-200/90' : 'text-slate-300'}>
+                                    {diag}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -824,25 +1005,185 @@ export const VerifyPage: React.FC = () => {
                     Need an official record?
                   </h4>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Download an audit dossier compiling the verification verdict, SHA-256 hash, extracted details, and all forensic signals.
+                    Configure and download an audit dossier in Standard Summary or Full Forensic Report format.
                   </p>
                 </div>
               </div>
 
               <button
-                onClick={handleDownloadPdf}
+                onClick={handleOpenExportModal}
                 disabled={isDownloadingPdf}
                 className="btn-primary text-xs py-2.5 px-5 cursor-pointer shrink-0 w-full sm:w-auto justify-center"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                <span>{isDownloadingPdf ? 'Generating PDF...' : 'Download PDF Dossier'}</span>
+                <span>{isDownloadingPdf ? 'Generating PDF...' : 'Configure & Download PDF'}</span>
               </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Secure PDF Export Settings Modal */}
+      {isExportModalOpen && data && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0e14]/85 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-[#121624] border border-slate-800 shadow-2xl p-6 text-slate-100">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 block">
+                  Secure Dossier Export
+                </span>
+                <h3 className="text-lg font-bold text-white">
+                  Configure PDF Output Format
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(false)}
+                className="text-slate-400 hover:text-white text-sm px-2 py-1 rounded-lg bg-slate-800/80 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Format Selector: Standard vs Forensic Report */}
+            <div className="space-y-3 mb-5">
+              <label className="text-xs font-semibold text-slate-300 block">
+                Report Template Mode
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPdfExportOptions(prev => ({
+                      ...prev,
+                      format: 'standard',
+                      includeEvidenceBreakdown: false,
+                      includeRawOcrText: false
+                    }))
+                  }
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    pdfExportOptions.format === 'standard'
+                      ? 'bg-indigo-600/20 border-indigo-500 text-white'
+                      : 'bg-[#0b0e14] border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-white">Standard Summary</span>
+                    {pdfExportOptions.format === 'standard' && (
+                      <span className="text-xs text-indigo-400 font-bold">●</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Concise 1-page executive verification summary with verdict, trust score, and extracted identity fields.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPdfExportOptions(prev => ({
+                      ...prev,
+                      format: 'forensic',
+                      includeEvidenceBreakdown: true,
+                      includeRawOcrText: true
+                    }))
+                  }
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                    pdfExportOptions.format === 'forensic'
+                      ? 'bg-indigo-600/20 border-indigo-500 text-white'
+                      : 'bg-[#0b0e14] border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-white">Forensic Report</span>
+                    {pdfExportOptions.format === 'forensic' && (
+                      <span className="text-xs text-indigo-400 font-bold">●</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Full compliance dossier including itemized ELA/Moiré evidence, checksum audit, and SHA-256 provenance.
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            {/* Granular Telemetry Toggles */}
+            <div className="space-y-2.5 p-4 rounded-xl bg-[#0b0e14] border border-slate-800/90 mb-6 text-xs">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-slate-300">Include Cryptographic SHA-256 Digest Banner</span>
+                <input
+                  type="checkbox"
+                  checked={pdfExportOptions.includeHashProvenance ?? true}
+                  onChange={e =>
+                    setPdfExportOptions(prev => ({
+                      ...prev,
+                      includeHashProvenance: e.target.checked
+                    }))
+                  }
+                  className="accent-indigo-500 w-4 h-4 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-slate-300">Include Itemized Forensic Evidence Signals</span>
+                <input
+                  type="checkbox"
+                  checked={
+                    pdfExportOptions.format === 'forensic' ||
+                    Boolean(pdfExportOptions.includeEvidenceBreakdown)
+                  }
+                  onChange={e =>
+                    setPdfExportOptions(prev => ({
+                      ...prev,
+                      includeEvidenceBreakdown: e.target.checked
+                    }))
+                  }
+                  className="accent-indigo-500 w-4 h-4 cursor-pointer"
+                />
+              </label>
+
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-slate-300">Include Raw OCR Stream Excerpt</span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(pdfExportOptions.includeRawOcrText)}
+                  onChange={e =>
+                    setPdfExportOptions(prev => ({
+                      ...prev,
+                      includeRawOcrText: e.target.checked
+                    }))
+                  }
+                  className="accent-indigo-500 w-4 h-4 cursor-pointer"
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsExportModalOpen(false)}
+                className="btn-secondary text-xs py-2 px-4 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDownloadPdf}
+                disabled={isDownloadingPdf}
+                className="btn-primary text-xs py-2 px-5 cursor-pointer"
+              >
+                <span>
+                  {isDownloadingPdf
+                    ? 'Generating PDF...'
+                    : `Download ${pdfExportOptions.format === 'forensic' ? 'Forensic Report' : 'Standard PDF'}`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Download Success Toast */}
       {downloadSuccessToast && (

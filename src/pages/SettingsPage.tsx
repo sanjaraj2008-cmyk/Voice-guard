@@ -1,18 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import { rlPolicyAgent } from '../utils/rlEngine';
 
 export const SettingsPage: React.FC = () => {
   const [clearedModels, setClearedModels] = useState<boolean>(false);
   const [clearedHistory, setClearedHistory] = useState<boolean>(false);
-  const [storageStatus, setStorageStatus] = useState<{ localStorageCount: number; sessionStorageCount: number }>({
+  const [storageStatus, setStorageStatus] = useState<{
+    localStorageCount: number;
+    sessionStorageCount: number;
+    rlEpochs: number;
+    rlMemoryCount: number;
+  }>({
     localStorageCount: 0,
-    sessionStorageCount: 0
+    sessionStorageCount: 0,
+    rlEpochs: 0,
+    rlMemoryCount: 0
   });
 
   const updateCounts = () => {
     try {
+      const stats = rlPolicyAgent.getStats();
       setStorageStatus({
         localStorageCount: localStorage.length,
-        sessionStorageCount: sessionStorage.length
+        sessionStorageCount: sessionStorage.length,
+        rlEpochs: stats.epochs,
+        rlMemoryCount: stats.memoryCount
       });
     } catch (_) {}
   };
@@ -42,6 +53,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleClearStorageData = () => {
     try {
+      rlPolicyAgent.resetToFactory();
       localStorage.clear();
       sessionStorage.clear();
       updateCounts();
@@ -53,70 +65,74 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <main className="min-h-screen pb-16 bg-[#F7F8FA]">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+    <main className="min-h-screen pb-24 text-slate-100">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-12">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#172033] mb-1">
-            Browser Storage &amp; Settings
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+            <span>RUNTIME &amp; STORAGE CONTROLS</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
+            Browser Storage &amp; RL Policy Settings
           </h1>
-          <p className="text-sm text-[#586579]">
-            Manage downloaded neural weights, temporary memory, and local browser data.
+          <p className="text-sm text-slate-400">
+            Manage downloaded neural weights, Reinforcement Learning policy memory, and local browser storage.
           </p>
         </div>
 
         {/* Local Processing Status */}
-        <div className="vg-card p-5 bg-white border border-[#E2E7EF] mb-6 shadow-sm">
+        <div className="p-5 rounded-2xl bg-[#121624] border border-slate-800 mb-6">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#15803d]" />
-            <h2 className="text-sm font-bold text-[#172033]">
-              Running 100% on this computer
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+            <h2 className="text-sm font-bold text-white">
+              Running on-device in your browser sandbox
             </h2>
           </div>
-          <p className="text-xs sm:text-sm text-[#586579] leading-relaxed">
-            All document checks occur in your browser's private memory. No document images or personal details are uploaded across the internet.
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+            All pixel forensics, Tesseract WASM OCR, and Reinforcement Learning policy updates execute in local browser memory.
           </p>
         </div>
 
         {/* Data Clearing Options */}
-        <div className="vg-card p-6 bg-white border border-[#E2E7EF] space-y-5 shadow-sm">
-          <h2 className="text-sm font-bold text-[#172033] pb-2 border-b border-[#E2E7EF]">
-            Clear Local Data
+        <div className="p-6 rounded-2xl bg-[#121624] border border-slate-800 space-y-5">
+          <h2 className="text-sm font-bold text-white pb-2 border-b border-slate-800">
+            Clear Local Data &amp; RL Memory
           </h2>
 
           {/* Model Weights */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-[#F7F8FA] border border-[#E2E7EF]">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#0b0e14] border border-slate-800">
             <div>
-              <span className="text-sm font-semibold text-[#172033] block">
-                Cached Model Weights
+              <span className="text-sm font-semibold text-white block">
+                Cached Neural Model Weights
               </span>
-              <span className="text-xs text-[#586579]">
-                Downloaded neural network file (4.13 MB) stored in your browser's cache for quick re-use.
+              <span className="text-xs text-slate-400">
+                Downloaded TensorFlow.js &amp; Tesseract WASM binaries stored in browser cache for instant offline reuse.
               </span>
             </div>
             <button
               onClick={handleClearModelCache}
-              className="vg-btn-secondary text-xs sm:text-sm py-2 px-3.5 shrink-0"
+              className="btn-secondary text-xs py-2 px-3.5 shrink-0 cursor-pointer"
             >
               {clearedModels ? '✓ Model cache cleared' : 'Clear model cache'}
             </button>
           </div>
 
-          {/* Session Data */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-[#F7F8FA] border border-[#E2E7EF]">
+          {/* Session Data & RL Policy */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#0b0e14] border border-slate-800">
             <div>
-              <span className="text-sm font-semibold text-[#172033] block">
-                Temporary Session Storage
+              <span className="text-sm font-semibold text-white block">
+                RL Policy Memory &amp; Session Storage
               </span>
-              <span className="text-xs text-[#586579]">
-                {storageStatus.localStorageCount} local storage items · {storageStatus.sessionStorageCount} session items
+              <span className="text-xs text-slate-400">
+                {storageStatus.rlEpochs} RL training epochs · {storageStatus.rlMemoryCount} remembered SHA-256 hashes · {storageStatus.localStorageCount} local items
               </span>
             </div>
             <button
               onClick={handleClearStorageData}
-              className="vg-btn-secondary text-xs sm:text-sm py-2 px-3.5 shrink-0"
+              className="btn-secondary text-xs py-2 px-3.5 shrink-0 cursor-pointer"
             >
-              {clearedHistory ? '✓ Storage cleared' : 'Clear session data'}
+              {clearedHistory ? '✓ Storage & RL reset' : 'Reset RL & Clear Storage'}
             </button>
           </div>
         </div>

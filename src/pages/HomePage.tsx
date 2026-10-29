@@ -1,11 +1,27 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivePage } from '../components/Navbar';
 
 interface HomePageProps {
   onNavigate: (page: ActivePage) => void;
 }
 
+const ROTATING_HEADLINE_PHRASES = [
+  'with confidence and privacy.',
+  'with zero cloud exposure.',
+  'with instant pixel forensics.',
+  'with neural OCR precision.'
+];
+
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
+  const [phraseIndex, setPhraseIndex] = useState<number>(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPhraseIndex((prev) => (prev + 1) % ROTATING_HEADLINE_PHRASES.length);
+    }, 3200);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <main className="relative overflow-hidden flex-1 flex flex-col text-slate-100">
       
@@ -17,10 +33,24 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           <span>On-device identity forensics · Zero cloud exposure</span>
         </div>
 
-        {/* Hero Title */}
+        {/* Hero Title with Smooth Vertical Scroll-Up Carousel */}
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-6 leading-[1.15]">
-          Verify identity documents <br className="hidden sm:block" />
-          <span className="text-indigo-400 font-extrabold">with confidence and privacy.</span>
+          <span className="block">Verify identity documents</span>
+          <span className="relative inline-flex justify-center overflow-hidden h-[1.22em] w-full align-bottom mt-1">
+            <span
+              className="flex flex-col transition-transform duration-700 ease-in-out w-full"
+              style={{ transform: `translateY(-${phraseIndex * 25}%)` }}
+            >
+              {ROTATING_HEADLINE_PHRASES.map((phrase) => (
+                <span
+                  key={phrase}
+                  className="h-[1.22em] flex items-center justify-center text-indigo-400 font-extrabold whitespace-nowrap"
+                >
+                  {phrase}
+                </span>
+              ))}
+            </span>
+          </span>
         </h1>
 
         {/* Subtitle */}

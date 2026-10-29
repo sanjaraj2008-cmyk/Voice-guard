@@ -2,11 +2,31 @@ import { jsPDF } from 'jspdf';
 import { DocumentVerificationData } from '../types/edge';
 import { getVerdictConfig } from './edgePipeline';
 
+export interface PdfExportOptions {
+  format: 'standard' | 'forensic';
+  includeHashProvenance?: boolean;
+  includeRawOcrText?: boolean;
+  includeEvidenceBreakdown?: boolean;
+}
+
 /**
  * Generates and triggers the direct download of a high-fidelity,
  * professional forensic identity screening assessment dossier in PDF format.
  */
-export async function generateAndDownloadDossierPdf(data: DocumentVerificationData): Promise<void> {
+export async function generateAndDownloadDossierPdf(
+  data: DocumentVerificationData,
+  options: PdfExportOptions = {
+    format: 'forensic',
+    includeHashProvenance: true,
+    includeRawOcrText: true,
+    includeEvidenceBreakdown: true
+  }
+): Promise<void> {
+  const isForensicMode = options.format === 'forensic';
+  const showHash = options.includeHashProvenance ?? true;
+  const showEvidence = isForensicMode || (options.includeEvidenceBreakdown ?? false);
+  const showRawOcr = isForensicMode && (options.includeRawOcrText ?? true);
+
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -173,29 +193,34 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
   // ---------------------------------------------------------
   // 2. CRYPTOGRAPHIC INTEGRITY & PROVENANCE TELEMETRY
   // ---------------------------------------------------------
-  renderSectionHeader('1. CRYPTOGRAPHIC PROVENANCE & DOCUMENT INTEGRITY HASH', [34, 211, 238]);
+  if (showHash) {
+    renderSectionHeader('1. CRYPTOGRAPHIC PROVENANCE & DOCUMENT INTEGRITY HASH', [34, 211, 238]);
 
-  // Document Hash Monospace Banner
-  pdf.setFillColor(6, 9, 32);
-  pdf.roundedRect(12, curY, 186, 17, 1.5, 1.5, 'F');
-  pdf.setDrawColor(34, 211, 238);
-  pdf.setLineWidth(0.3);
-  pdf.roundedRect(12, curY, 186, 17, 1.5, 1.5, 'S');
+    // Document Hash Monospace Banner
+    pdf.setFillColor(6, 9, 32);
+    pdf.roundedRect(12, curY, 186, 17, 1.5, 1.5, 'F');
+    pdf.setDrawColor(34, 211, 238);
+    pdf.setLineWidth(0.3);
+    pdf.roundedRect(12, curY, 186, 17, 1.5, 1.5, 'S');
 
-  pdf.setTextColor(34, 211, 238);
-  pdf.setFontSize(6.5);
-  pdf.setFont('helvetica', 'bold');
-  pdf.text('DOCUMENT INTEGRITY DIGEST (SHA-256):', 16, curY + 5);
+    pdf.setTextColor(34, 211, 238);
+    pdf.setFontSize(6.5);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('DOCUMENT INTEGRITY DIGEST (SHA-256):', 16, curY + 5);
 
-  pdf.setTextColor(226, 232, 240);
-  pdf.setFont('courier', 'bold');
-  pdf.setFontSize(7.2);
-  pdf.text(docHash, 16, curY + 11.5);
+    pdf.setTextColor(226, 232, 240);
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(7.2);
+    pdf.text(docHash, 16, curY + 11.5);
 
-  curY += 20;
+    curY += 20;
+  } else {
+    renderSectionHeader('1. DOCUMENT IDENTIFICATION & PROVENANCE', [34, 211, 238]);
+  }
 
   renderMetricRow('Target File Payload', data.fileName);
   renderMetricRow('Internal Reference ID', data.documentId);
+  renderMetricRow('Report Output Format', isForensicMode ? 'FULL FORENSIC DOSSIER' : 'STANDARD SUMMARY REPORT', true);
   renderMetricRow(
     'Digital Signature Container',
     data.conceptEvaluation?.cryptographicIntegrity?.signatureFound
@@ -203,7 +228,7 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
       : 'NONE DETECTED (Physical photographic substrate / Raw raster)'
   );
   renderMetricRow('Execution Sandbox', 'Client-Side WebAssembly (Zero-Knowledge, Air-Gapped)');
-  renderMetricRow('Assessment Engine', data.analyzerVersion || 'DocuGuard Edge v2.6.4 (WASM Core + Gemini 3.8 Flash)');
+  renderMetricRow('Assessment Engine', data.analyzerVersion || 'DocuGuard Edge v2.8.0 (WASM Core + CNN + RL Policy Agent)');
 
   curY += 3;
 
@@ -261,6 +286,12 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
     renderMetricRow('OCR Fields', 'No structured fields recognized');
   }
 
+  if (showRawOcr && data.ocr.rawText) {
+    checkPageBreak(18);
+    const rawSnippet = data.ocr.rawText.replace(/\s+/g, ' ').slice(0, 220);
+    renderMetricRow('Raw OCR Stream Excerpt', rawSnippet);
+  }
+
   // Checksum telemetry box (Verhoeff / PAN)
   if (data.conceptEvaluation?.contentConsistency) {
     checkPageBreak(12);
@@ -289,49 +320,51 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
   // ---------------------------------------------------------
   // 5. ITEMIZED FORENSIC EVIDENCE & ANOMALY SIGNALS
   // ---------------------------------------------------------
-  checkPageBreak(40);
-  renderSectionHeader('4. ITEMIZED FORENSIC EVIDENCE & ANOMALY SIGNALS', [232, 121, 249]);
+  if (showEvidence) {
+    checkPageBreak(40);
+    renderSectionHeader('4. ITEMIZED FORENSIC EVIDENCE & ANOMALY SIGNALS', [232, 121, 249]);
 
-  for (const ev of data.evidence) {
-    checkPageBreak(18);
+    for (const ev of data.evidence) {
+      checkPageBreak(18);
 
-    const sevColor: [number, number, number] = 
-      ev.severity === 'pass' ? [16, 185, 129] : 
-      ev.severity === 'warn' ? [245, 158, 11] : 
-      [225, 29, 72];
+      const sevColor: [number, number, number] = 
+        ev.severity === 'pass' ? [16, 185, 129] : 
+        ev.severity === 'warn' ? [245, 158, 11] : 
+        [225, 29, 72];
 
-    pdf.setFillColor(6, 8, 28);
-    pdf.roundedRect(12, curY, 186, 15, 1, 1, 'F');
-    pdf.setDrawColor(sevColor[0], sevColor[1], sevColor[2]);
-    pdf.setLineWidth(0.6);
-    pdf.line(12, curY, 12, curY + 15);
+      pdf.setFillColor(6, 8, 28);
+      pdf.roundedRect(12, curY, 186, 15, 1, 1, 'F');
+      pdf.setDrawColor(sevColor[0], sevColor[1], sevColor[2]);
+      pdf.setLineWidth(0.6);
+      pdf.line(12, curY, 12, curY + 15);
 
-    // Indicator Badge line
-    pdf.setTextColor(sevColor[0], sevColor[1], sevColor[2]);
-    pdf.setFontSize(6.8);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(`[${ev.category.toUpperCase()}] ${ev.severity.toUpperCase()}`, 16, curY + 4);
+      // Indicator Badge line
+      pdf.setTextColor(sevColor[0], sevColor[1], sevColor[2]);
+      pdf.setFontSize(6.8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`[${ev.category.toUpperCase()}] ${ev.severity.toUpperCase()}`, 16, curY + 4);
 
-    pdf.setTextColor(148, 163, 184);
-    pdf.setFontSize(6.2);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(`Confidence: ${(ev.confidence * 100).toFixed(0)}%  |  Weight: ${ev.weight}%`, 140, curY + 4);
+      pdf.setTextColor(148, 163, 184);
+      pdf.setFontSize(6.2);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Confidence: ${(ev.confidence * 100).toFixed(0)}%  |  Weight: ${ev.weight}%`, 140, curY + 4);
 
-    // Observation
-    pdf.setTextColor(241, 245, 249);
-    pdf.setFontSize(6.8);
-    pdf.setFont('helvetica', 'bold');
-    const obsLines = pdf.splitTextToSize(ev.observation, 174);
-    pdf.text(obsLines[0] || ev.observation, 16, curY + 8);
+      // Observation
+      pdf.setTextColor(241, 245, 249);
+      pdf.setFontSize(6.8);
+      pdf.setFont('helvetica', 'bold');
+      const obsLines = pdf.splitTextToSize(ev.observation, 174);
+      pdf.text(obsLines[0] || ev.observation, 16, curY + 8);
 
-    // Technical explanation
-    pdf.setTextColor(148, 163, 184);
-    pdf.setFontSize(6);
-    pdf.setFont('helvetica', 'normal');
-    const expLines = pdf.splitTextToSize(ev.explanation, 174);
-    pdf.text(expLines[0] || ev.explanation, 16, curY + 12);
+      // Technical explanation
+      pdf.setTextColor(148, 163, 184);
+      pdf.setFontSize(6);
+      pdf.setFont('helvetica', 'normal');
+      const expLines = pdf.splitTextToSize(ev.explanation, 174);
+      pdf.text(expLines[0] || ev.explanation, 16, curY + 12);
 
-    curY += 17.5;
+      curY += 17.5;
+    }
   }
 
   // ---------------------------------------------------------
@@ -371,6 +404,7 @@ export async function generateAndDownloadDossierPdf(data: DocumentVerificationDa
     pdf.text(`PAGE ${i} OF ${totalPages}`, 190, 293, { align: 'right' });
   }
 
+  const suffix = isForensicMode ? 'Forensic_Dossier' : 'Standard_Summary';
   // Save PDF directly to user's downloads
-  pdf.save(`DocuGuard_Forensic_Dossier_${data.documentId}.pdf`);
+  pdf.save(`DocuGuard_${suffix}_${data.documentId}.pdf`);
 }

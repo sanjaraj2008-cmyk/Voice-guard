@@ -52,16 +52,16 @@ app.post('/api/analyze', async (req, res) => {
       }
     });
 
-    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
 
-    const prompt = `You are a Principal Digital Forensics and Document Identity Verification Expert for law enforcement and border customs (Smart India Hackathon SIH-26188).
-Examine this identity document (${fileName}) with extreme forensic rigor:
+    const prompt = `You are a Principal Digital Forensics and Optical Character Recognition (OCR) Expert for law enforcement and border customs.
+Examine this identity document (${fileName}) with extreme forensic rigor and high-accuracy optical character recognition:
 
 1. Look for photo substitution / replacement (edge sharpness differences, drop shadows around portrait, head size mismatch).
 2. Look for digital text alteration (kerning discrepancy, blurry noise halo around dates or ID numbers, inconsistent font typeface, baseline misalignment).
 3. Look for screen re-photography (Moiré interference stripes, LCD/OLED pixel grid, display glare).
-4. Verify document structure against official standard templates (such as Indian Aadhaar, PAN card, Passport, or National ID).
-5. Extract key identity fields (Full Name, Document ID, Date of Birth, Gender, Address, Expiry/Issue dates).
+4. Verify document structure against official standard templates (such as Indian Aadhaar, PAN card, Passport, Voter ID, Driving License, or National ID).
+5. Perform verbatim Optical Character Recognition (OCR) to extract ALL visible text into "rawText" and accurately populate "fields" (Full Name, Document ID, Date of Birth, Gender, Address, Expiry Date, Document Type). Leave a field as "" if genuinely not present on the document—never invent placeholder values.
 
 Return a valid JSON object strictly matching this schema:
 {
@@ -76,6 +76,7 @@ Return a valid JSON object strictly matching this schema:
     "dateOfBirth": string,
     "gender": string,
     "address": string,
+    "expiryDate": string,
     "documentType": string
   },
   "rawText": string,
@@ -92,10 +93,11 @@ Return a valid JSON object strictly matching this schema:
 }`;
 
     let responseText: string | null = null;
+    let modelUsed: string = '';
     let quotaHit = false;
 
-    // Try gemini-3.1-flash-lite first, fallback to gemini-3.8-flash, and handle quota exhaustion gracefully
-    const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    // Try gemini-3.8-flash, gemini-3.1-flash-lite, and gemini-flash-latest with graceful fallback
+    const modelsToTry = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
 
     for (const modelName of modelsToTry) {
       try {
@@ -122,6 +124,7 @@ Return a valid JSON object strictly matching this schema:
 
         if (response.text) {
           responseText = response.text;
+          modelUsed = modelName;
           break;
         }
       } catch (callErr: any) {
@@ -141,8 +144,12 @@ Return a valid JSON object strictly matching this schema:
     }
 
     if (responseText) {
-      const parsed = JSON.parse(responseText);
-      return res.status(200).json({ success: true, ...parsed });
+      const sanitizedJson = responseText
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+      const parsed = JSON.parse(sanitizedJson);
+      return res.status(200).json({ success: true, modelUsed, ...parsed });
     }
 
     // Graceful fallback for quota limits or offline environments

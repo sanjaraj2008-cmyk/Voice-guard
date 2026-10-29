@@ -101,6 +101,9 @@ export interface DocumentVerificationData {
     fields: OCRFields;
     rawText: string;
     confidence: number;
+    engineUsed?: string;
+    passCount?: number;
+    diagnostics?: string[];
   };
   evidence: ForensicEvidenceItem[];
   conceptEvaluation?: ConceptEvaluation;
